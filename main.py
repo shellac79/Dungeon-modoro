@@ -1,6 +1,8 @@
 import pygame
 import sys
 import random
+import json
+import os
 
 # 1. 플레이어 데이터 클래스 
 class Player:
@@ -25,6 +27,35 @@ class Boss:
         self.current_hp = self.max_hp
         self.atk = 5 + (stage * 3)      
 
+# 💾 [추가 기능] 데이터 저장 함수
+def save_game(player, stage):
+    data = {
+        "max_hp": player.max_hp,
+        "atk": player.atk,
+        "hp_level": player.hp_level,
+        "atk_level": player.atk_level,
+        "resource": player.resource,
+        "stage": stage
+    }
+    with open("save_data.json", "w") as f:
+        json.dump(data, f)
+    print("💾 자동 저장 완료!")
+
+# 💾 [추가 기능] 데이터 불러오기 함수
+def load_game(player):
+    if os.path.exists("save_data.json"):
+        with open("save_data.json", "r") as f:
+            data = json.load(f)
+            player.max_hp = data.get("max_hp", 100)
+            player.atk = data.get("atk", 10)
+            player.hp_level = data.get("hp_level", 0)
+            player.atk_level = data.get("atk_level", 0)
+            player.resource = data.get("resource", 0)
+            player.current_hp = player.max_hp
+            print("💾 저장된 데이터를 불러왔습니다!")
+            return data.get("stage", 1)
+    return 1 # 세이브 파일이 없으면 1스테이지부터 시작
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode((800, 600))
@@ -32,6 +63,9 @@ def main():
     clock = pygame.time.Clock()
 
     player = Player()
+    
+    # 💡 게임 시작 시 자동으로 데이터 불러오기
+    stage = load_game(player)
     
     font = pygame.font.SysFont("malgun gothic", 36)
     small_font = pygame.font.SysFont("malgun gothic", 24)
@@ -43,7 +77,6 @@ def main():
     pygame.time.set_timer(pygame.USEREVENT, 1000)
     BATTLE_EVENT = pygame.USEREVENT + 1
     
-    stage = 1
     boss = None
     battle_log = []
     turn = "PLAYER"
@@ -52,28 +85,27 @@ def main():
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                # 💡 끌 때도 무조건 한 번 저장!
+                save_game(player, stage)
                 pygame.quit()
                 sys.exit()
 
             # --- PHASE 0: 시작 메뉴 화면 (마을) ---
             if current_state == "MENU":
                 if event.type == pygame.KEYDOWN:
-                    # [1] 탐험 시작 (타이머)
                     if event.key == pygame.K_1:
-                        time_left = 1500 # 25분 세팅
+                        time_left = 1500
                         current_state = "TIMER"
-                    # [2] 대장간 입장
                     elif event.key == pygame.K_2:
                         current_state = "UPGRADE"
-                    # [3] 보스전 도전!
                     elif event.key == pygame.K_3:
                         current_state = "BATTLE"
-                        player.current_hp = player.max_hp # 전투 전 체력 풀회복
+                        player.current_hp = player.max_hp
                         boss = Boss(stage)
                         battle_log = [f"--- 스테이지 {stage} 보스전 시작! ---"]
                         turn = "PLAYER"
                         battle_status = "ONGOING"
-                        pygame.time.set_timer(BATTLE_EVENT, 1000) # 자동 전투 1초 간격 시작
+                        pygame.time.set_timer(BATTLE_EVENT, 1000)
             
             # --- PHASE 1: 탐험 (타이머) ---
             elif current_state == "TIMER":
@@ -87,13 +119,11 @@ def main():
                         if time_left % 10 == 0:
                             player.temp_resource += 10 
                     else:
-                        # 🚨 타이머 종료 시: 자원 정산 후 '메뉴'로 복귀! (보스전 강제 돌입 X)
                         player.resource += player.temp_resource
                         player.temp_resource = 0
                         current_state = "MENU"
-                        print("✅ 집중 완료! 자원을 획득하고 마을로 복귀했습니다.")
+                        save_game(player, stage) # 💾 마을 복귀 시 자동 저장
 
-                # 개발자 스킵용 치트키
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         time_left = 0
@@ -107,9 +137,6 @@ def main():
                             if random.random() < player.get_success_rate(player.hp_level):
                                 player.max_hp += 20
                                 player.hp_level += 1
-                                print(f"✨ 체력 강화 성공! (Lv.{player.hp_level})")
-                            else:
-                                print("💥 체력 강화 실패...")
                     
                     elif event.key == pygame.K_2 and player.resource >= 1:
                         if player.atk_level < 30:
@@ -117,13 +144,10 @@ def main():
                             if random.random() < player.get_success_rate(player.atk_level):
                                 player.atk += 5
                                 player.atk_level += 1
-                                print(f"✨ 공격력 강화 성공! (Lv.{player.atk_level})")
-                            else:
-                                print("💥 공격력 강화 실패...")
 
-                    # 엔터 키 누르면 메뉴로 복귀
                     elif event.key == pygame.K_RETURN:
                         current_state = "MENU"
+                        save_game(player, stage) # 💾 마을 복귀 시 자동 저장
 
             # --- PHASE 3: 보스전 ---
             elif current_state == "BATTLE":
@@ -151,22 +175,20 @@ def main():
                     if len(battle_log) > 5:
                         battle_log.pop(0)
 
-                # 승리/패배 후 스페이스바 누르면 메뉴로 복귀
                 if event.type == pygame.KEYDOWN and battle_status != "ONGOING":
                     if event.key == pygame.K_SPACE:
                         if battle_status == "VICTORY":
-                            stage += 1 # 이기면 스테이지 상승
-                            current_state = "MENU"
+                            stage += 1
                         elif battle_status == "DEFEAT":
-                            player = Player() # 지면 스탯 싹 초기화
+                            player = Player() # 패배 시 초기화 (혹은 자원만 유지하게 바꿀 수도 있음!)
                             stage = 1
-                            current_state = "MENU"
+                        current_state = "MENU"
+                        save_game(player, stage) # 💾 마을 복귀 시 자동 저장
 
 
         # --- 화면 그리기 렌더링 파트 ---
         screen.fill((40, 40, 40))
 
-        # 🎨 메뉴 화면
         if current_state == "MENU":
             game_title = title_font.render("던전모도로", True, (255, 215, 0))
             sub_title = font.render(f"- 집중의 시간 | 현재 스테이지: {stage} -", True, (200, 200, 200))
@@ -181,7 +203,6 @@ def main():
             screen.blit(menu2, (150, 370))
             screen.blit(menu3, (150, 440))
 
-        # 🎨 타이머 화면
         elif current_state == "TIMER":
             minutes = time_left // 60
             seconds = time_left % 60
@@ -197,7 +218,6 @@ def main():
             screen.blit(timer_text, (50, 120))
             screen.blit(info_text, (50, 170))
 
-        # 🎨 대장간 화면
         elif current_state == "UPGRADE":
             hp_prob = player.get_success_rate(player.hp_level) * 100
             atk_prob = player.get_success_rate(player.atk_level) * 100
@@ -218,7 +238,6 @@ def main():
             screen.blit(guide2, (50, 270))
             screen.blit(guide_next, (50, 370))
 
-        # 🎨 보스전 화면
         elif current_state == "BATTLE":
             title_text = font.render(f"[보스전 - 스테이지 {stage}]", True, (255, 50, 50))
             
