@@ -57,21 +57,19 @@ def draw_hp_bar(screen, x, y, w, h, current_hp, max_hp):
     pygame.draw.rect(screen, (40, 180, 40), (x, y, int(w * ratio), h)) 
     pygame.draw.rect(screen, (200, 200, 200), (x, y, w, h), 2) 
 
-# 💡 [핵심 추가 1] 레벨에 따라 다중 광물 요구량을 리스트로 반환하는 함수
 def get_upgrade_req(level):
-    req = [0, 0, 0] # [철, 미스릴, 아다만티움] 필요량
+    req = [0, 0, 0] 
     if level < 10:
-        req[0] = (level % 10) + 1 # 1~10개
+        req[0] = (level % 10) + 1 
     elif level < 20:
-        req[0] = 5                # 철 5개 기본
-        req[1] = (level % 10) + 1 # 미스릴 1~10개
+        req[0] = 5                
+        req[1] = (level % 10) + 1 
     else:
-        req[0] = 10               # 철 10개 기본
-        req[1] = 5                # 미스릴 5개 기본
-        req[2] = (level % 10) + 1 # 아다만 1~10개
+        req[0] = 10               
+        req[1] = 5                
+        req[2] = (level % 10) + 1 
     return req
 
-# 💡 [핵심 추가 2] 필요 광물 리스트를 예쁜 텍스트로 변환하는 함수
 def req_to_string(req_list):
     res = []
     if req_list[0] > 0: res.append(f"철 {req_list[0]}")
@@ -93,7 +91,8 @@ def main():
     title_font = pygame.font.SysFont("malgun gothic", 46, bold=True)
     
     current_state = "MENU"
-    time_left = 1500 
+    time_left = 0 
+    dungeon_type = 1 
     
     pygame.time.set_timer(pygame.USEREVENT, 1000)
     BATTLE_EVENT = pygame.USEREVENT + 1
@@ -110,11 +109,11 @@ def main():
                 pygame.quit()
                 sys.exit()
 
+            # --- 메뉴 화면 ---
             if current_state == "MENU":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1:
-                        time_left = 1500
-                        current_state = "TIMER"
+                        current_state = "SELECT_DUNGEON" 
                     elif event.key == pygame.K_2:
                         current_state = "UPGRADE"
                     elif event.key == pygame.K_3:
@@ -125,7 +124,22 @@ def main():
                         turn = "PLAYER"
                         battle_status = "ONGOING"
                         pygame.time.set_timer(BATTLE_EVENT, 1000)
+
+            # --- 던전 선택 화면 ---
+            elif current_state == "SELECT_DUNGEON":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1:
+                        time_left = 1500 # 25분
+                        dungeon_type = 1
+                        current_state = "TIMER"
+                    elif event.key == pygame.K_2:
+                        time_left = 3000 # 50분
+                        dungeon_type = 2
+                        current_state = "TIMER"
+                    elif event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+                        current_state = "MENU" 
             
+            # --- 타이머 (탐험) 화면 ---
             elif current_state == "TIMER":
                 if event.type == pygame.WINDOWFOCUSLOST:
                     player.temp_ores = [0, 0, 0] 
@@ -136,12 +150,16 @@ def main():
                         if time_left % 10 == 0:
                             for _ in range(5):
                                 roll = random.randint(1, 100)
-                                if roll <= 60:
-                                    player.temp_ores[0] += 1 
-                                elif roll <= 90:
-                                    player.temp_ores[1] += 1 
-                                else:
-                                    player.temp_ores[2] += 1 
+                                if dungeon_type == 1:
+                                    # 얕은 숲 (철 60, 미스릴 30, 아다만 10)
+                                    if roll <= 60: player.temp_ores[0] += 1 
+                                    elif roll <= 90: player.temp_ores[1] += 1 
+                                    else: player.temp_ores[2] += 1 
+                                elif dungeon_type == 2:
+                                    # 💡 심연의 동굴 확률 수정 (철 45, 미스릴 35, 아다만 20)
+                                    if roll <= 45: player.temp_ores[0] += 1 
+                                    elif roll <= 80: player.temp_ores[1] += 1 
+                                    else: player.temp_ores[2] += 1 
                     else:
                         for i in range(3):
                             player.ores[i] += player.temp_ores[i]
@@ -153,12 +171,11 @@ def main():
                     if event.key == pygame.K_SPACE:
                         time_left = 0
 
+            # --- 대장간 화면 ---
             elif current_state == "UPGRADE":
                 if event.type == pygame.KEYDOWN:
-                    # 💡 [로직 수정] 1번: 다중 자원 소모 체크 및 체력 강화
                     if event.key == pygame.K_1 and player.hp_level < 30:
                         reqs = get_upgrade_req(player.hp_level)
-                        # 보유량이 필요량보다 모두 같거나 큰지 확인
                         if player.ores[0] >= reqs[0] and player.ores[1] >= reqs[1] and player.ores[2] >= reqs[2]:
                             player.ores[0] -= reqs[0]
                             player.ores[1] -= reqs[1]
@@ -167,7 +184,6 @@ def main():
                                 player.max_hp += 20
                                 player.hp_level += 1
                     
-                    # 💡 [로직 수정] 2번: 다중 자원 소모 체크 및 공격력 강화
                     elif event.key == pygame.K_2 and player.atk_level < 30:
                         reqs = get_upgrade_req(player.atk_level)
                         if player.ores[0] >= reqs[0] and player.ores[1] >= reqs[1] and player.ores[2] >= reqs[2]:
@@ -182,6 +198,7 @@ def main():
                         current_state = "MENU"
                         save_game(player, stage)
 
+            # --- 보스전 화면 ---
             elif current_state == "BATTLE":
                 if event.type == BATTLE_EVENT and battle_status == "ONGOING":
                     if turn == "PLAYER":
@@ -231,7 +248,7 @@ def main():
             
             draw_panel(screen, 150, 200, 500, 320, border_color=(100, 150, 200))
             
-            menu1 = font.render("[1] 탐험 시작 (25분 집중 파밍)", True, (150, 255, 150))
+            menu1 = font.render("[1] 던전 입장 (탐험 지역 선택)", True, (150, 255, 150))
             menu2 = font.render("[2] 대장간 입장", True, (150, 200, 255))
             inventory = small_font.render(f"보유 광물: [{ore_str}]", True, (255, 215, 0))
             menu3 = font.render("[3] 보스전 도전", True, (255, 150, 150))
@@ -241,21 +258,48 @@ def main():
             screen.blit(inventory, (240, 340)) 
             screen.blit(menu3, (200, 410))
 
+        elif current_state == "SELECT_DUNGEON":
+            game_title = title_font.render("목적지 선택", True, (150, 255, 150)) 
+            sub_title = font.render("어디로 탐험을 떠나시겠습니까?", True, (150, 150, 150))
+            screen.blit(game_title, (270, 60))
+            screen.blit(sub_title, (220, 130))
+            
+            draw_panel(screen, 100, 200, 600, 320, border_color=(150, 255, 150))
+            
+            dun1_title = font.render("[1] 얕은 숲 (25분 집중)", True, (200, 255, 200))
+            dun1_desc = small_font.render("기본적인 철광석 위주로 안전하게 파밍합니다.", True, (150, 150, 150))
+            
+            dun2_title = font.render("[2] 심연의 동굴 (50분 딥워크)", True, (255, 150, 255))
+            dun2_desc = small_font.render("희귀한 미스릴과 아다만티움의 발견 확률이 증가합니다.", True, (200, 150, 200))
+            
+            cancel_txt = small_font.render("[Enter] 마을로 돌아가기", True, (150, 150, 150))
+            
+            screen.blit(dun1_title, (140, 230))
+            screen.blit(dun1_desc, (170, 270))
+            
+            screen.blit(dun2_title, (140, 340))
+            screen.blit(dun2_desc, (170, 380))
+            
+            screen.blit(cancel_txt, (500, 470))
+
         elif current_state == "TIMER":
-            draw_panel(screen, 120, 120, 560, 350, border_color=(100, 255, 100))
+            dungeon_name = "얕은 숲" if dungeon_type == 1 else "심연의 동굴"
+            border_col = (100, 255, 100) if dungeon_type == 1 else (200, 100, 255)
+            
+            draw_panel(screen, 120, 120, 560, 350, border_color=border_col)
             
             minutes = time_left // 60
             seconds = time_left % 60
             time_str = f"{minutes:02d}:{seconds:02d}"
 
-            title_text = title_font.render(f"스테이지 {stage} 탐험 중", True, (255, 255, 255))
+            title_text = title_font.render(f"[{dungeon_name}] 탐험 중...", True, (255, 255, 255))
             timer_text = title_font.render(f"⏳ {time_str}", True, (100, 255, 100))
             
             info_text = small_font.render(f"창고: [{ore_str}]", True, (200, 200, 200))
             temp_text = font.render(f"가방(임시): [{temp_ore_str}]", True, (255, 215, 0))
             warning_text = small_font.render("경고: 창을 벗어나면 가방 안의 광물이 모두 증발합니다!", True, (255, 100, 100))
             
-            screen.blit(title_text, (220, 150))
+            screen.blit(title_text, (200, 150))
             screen.blit(timer_text, (310, 220))
             screen.blit(info_text, (180, 300))
             screen.blit(temp_text, (180, 340))
@@ -271,7 +315,6 @@ def main():
             screen.blit(title_text, (60, 75))
             screen.blit(stat_text, (60, 130))
 
-            # 💡 패널을 살짝 키워서 긴 글자도 다 들어가게 수정
             draw_panel(screen, 30, 220, 740, 320, border_color=(100, 100, 150))
             
             hp_req_str = req_to_string(get_upgrade_req(player.hp_level))
