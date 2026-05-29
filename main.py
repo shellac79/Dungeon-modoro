@@ -4,6 +4,27 @@ import random
 import json
 import os
 
+# 🎵 [신규] 사운드 매니저 클래스 (파일이 없어도 에러 안 나게 안전 처리!)
+class SoundManager:
+    def __init__(self):
+        pygame.mixer.init()
+        self.sounds = {}
+        # 사용할 효과음 이름과 파일명 매칭
+        self.load_sound("click", "click.wav")       # 메뉴 이동, 버튼 클릭
+        self.load_sound("hit", "hit.wav")           # 전투 타격음
+        self.load_sound("upgrade", "upgrade.wav")   # 강화 성공
+        self.load_sound("error", "error.wav")       # 자원 부족 등 에러음
+
+    def load_sound(self, name, filename):
+        if os.path.exists(filename):
+            self.sounds[name] = pygame.mixer.Sound(filename)
+        else:
+            self.sounds[name] = None # 파일이 없으면 None으로 안전하게 보관
+
+    def play(self, name):
+        if name in self.sounds and self.sounds[name] is not None:
+            self.sounds[name].play()
+
 class Player:
     def __init__(self):
         self.max_hp = 100     
@@ -11,7 +32,7 @@ class Player:
         self.atk = 10
         self.hp_level = 0
         self.atk_level = 0
-        self.ores = [0, 0, 0] # 철, 미스릴, 아다만티움
+        self.ores = [0, 0, 0] 
         self.temp_ores = [0, 0, 0] 
 
     def get_success_rate(self, level):
@@ -83,6 +104,9 @@ def main():
     pygame.display.set_caption("던전모도로 - 집중의 시간")
     clock = pygame.time.Clock()
 
+    # 🎵 사운드 매니저 가동!
+    sm = SoundManager()
+
     player = Player()
     stage = load_game(player)
     
@@ -112,6 +136,9 @@ def main():
             # --- 메뉴 화면 ---
             if current_state == "MENU":
                 if event.type == pygame.KEYDOWN:
+                    if event.key in [pygame.K_1, pygame.K_2, pygame.K_3]:
+                        sm.play("click") # 🎵 메뉴 이동 소리
+                    
                     if event.key == pygame.K_1:
                         current_state = "SELECT_DUNGEON" 
                     elif event.key == pygame.K_2:
@@ -128,12 +155,15 @@ def main():
             # --- 던전 선택 화면 ---
             elif current_state == "SELECT_DUNGEON":
                 if event.type == pygame.KEYDOWN:
+                    if event.key in [pygame.K_1, pygame.K_2, pygame.K_ESCAPE, pygame.K_RETURN]:
+                        sm.play("click") # 🎵 클릭 소리
+                        
                     if event.key == pygame.K_1:
-                        time_left = 1500 # 25분
+                        time_left = 1500 
                         dungeon_type = 1
                         current_state = "TIMER"
                     elif event.key == pygame.K_2:
-                        time_left = 3000 # 50분
+                        time_left = 3000 
                         dungeon_type = 2
                         current_state = "TIMER"
                     elif event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
@@ -142,6 +172,8 @@ def main():
             # --- 타이머 (탐험) 화면 ---
             elif current_state == "TIMER":
                 if event.type == pygame.WINDOWFOCUSLOST:
+                    if sum(player.temp_ores) > 0:
+                        sm.play("error") # 🎵 딴짓해서 광물 날아갈 때 에러 소리!
                     player.temp_ores = [0, 0, 0] 
                 
                 if event.type == pygame.USEREVENT:
@@ -151,12 +183,10 @@ def main():
                             for _ in range(5):
                                 roll = random.randint(1, 100)
                                 if dungeon_type == 1:
-                                    # 얕은 숲 (철 60, 미스릴 30, 아다만 10)
                                     if roll <= 60: player.temp_ores[0] += 1 
                                     elif roll <= 90: player.temp_ores[1] += 1 
                                     else: player.temp_ores[2] += 1 
                                 elif dungeon_type == 2:
-                                    # 💡 심연의 동굴 확률 수정 (철 45, 미스릴 35, 아다만 20)
                                     if roll <= 45: player.temp_ores[0] += 1 
                                     elif roll <= 80: player.temp_ores[1] += 1 
                                     else: player.temp_ores[2] += 1 
@@ -166,9 +196,11 @@ def main():
                         player.temp_ores = [0, 0, 0]
                         current_state = "MENU"
                         save_game(player, stage)
+                        sm.play("upgrade") # 🎵 탐험 무사 완료 시 빰빠밤 소리!
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
+                        sm.play("click")
                         time_left = 0
 
             # --- 대장간 화면 ---
@@ -183,6 +215,11 @@ def main():
                             if random.random() < player.get_success_rate(player.hp_level):
                                 player.max_hp += 20
                                 player.hp_level += 1
+                                sm.play("upgrade") # 🎵 강화 성공!
+                            else:
+                                sm.play("hit") # 🎵 강화 실패 깡!
+                        else:
+                            sm.play("error") # 🎵 자원 부족
                     
                     elif event.key == pygame.K_2 and player.atk_level < 30:
                         reqs = get_upgrade_req(player.atk_level)
@@ -193,8 +230,14 @@ def main():
                             if random.random() < player.get_success_rate(player.atk_level):
                                 player.atk += 5
                                 player.atk_level += 1
+                                sm.play("upgrade") # 🎵 강화 성공!
+                            else:
+                                sm.play("hit") # 🎵 강화 실패 깡!
+                        else:
+                            sm.play("error") # 🎵 자원 부족
 
                     elif event.key == pygame.K_RETURN:
+                        sm.play("click")
                         current_state = "MENU"
                         save_game(player, stage)
 
@@ -204,9 +247,12 @@ def main():
                     if turn == "PLAYER":
                         boss.current_hp -= player.atk
                         battle_log.append(f"▶ 플레이어의 공격! 보스에게 {player.atk} 피해.")
+                        sm.play("hit") # 🎵 플레이어 공격 소리
+                        
                         if boss.current_hp <= 0:
                             battle_log.append("🏆 보스 처치! (스페이스바: 메뉴로 복귀)")
                             battle_status = "VICTORY"
+                            sm.play("upgrade") # 🎵 승리 팡파레!
                             pygame.time.set_timer(BATTLE_EVENT, 0) 
                         else:
                             turn = "BOSS" 
@@ -214,9 +260,12 @@ def main():
                     elif turn == "BOSS":
                         player.current_hp -= boss.atk
                         battle_log.append(f"▷ 보스의 공격! 플레이어에게 {boss.atk} 피해.")
+                        sm.play("hit") # 🎵 보스 공격 소리
+                        
                         if player.current_hp <= 0:
                             battle_log.append("💀 사망... (스페이스바: 스탯 리셋 후 메뉴 복귀)")
                             battle_status = "DEFEAT"
+                            sm.play("error") # 🎵 패배 소리
                             pygame.time.set_timer(BATTLE_EVENT, 0)
                         else:
                             turn = "PLAYER"
@@ -226,6 +275,7 @@ def main():
 
                 if event.type == pygame.KEYDOWN and battle_status != "ONGOING":
                     if event.key == pygame.K_SPACE:
+                        sm.play("click")
                         if battle_status == "VICTORY":
                             stage += 1
                         elif battle_status == "DEFEAT":
