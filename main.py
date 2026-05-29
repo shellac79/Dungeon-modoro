@@ -1,13 +1,14 @@
 import pygame
 import sys
-import random # 확률 강화를 위해 추가
+import random 
 
+# 1. 플레이어 데이터 클래스 (중복 제거 및 하나로 통합)
 class Player:
     def __init__(self):
         self.hp = 100
         self.atk = 10
-        self.resource = 0       
-        self.temp_resource = 0  
+        self.resource = 0       # 확정 자원
+        self.temp_resource = 0  # 딴짓하면 날아갈 임시 자원
 
 def main():
     pygame.init()
@@ -17,6 +18,7 @@ def main():
 
     player = Player()
     
+    # 폰트 설정 (큰 글씨와 작은 글씨 모두 포함)
     font = pygame.font.SysFont("malgun gothic", 36)
     small_font = pygame.font.SysFont("malgun gothic", 24)
     
@@ -33,10 +35,12 @@ def main():
             
             # --- PHASE 1: 타이머 화면 이벤트 ---
             if current_state == "TIMER":
+                # 🚨 화면 포커스를 잃었을 때 (Alt+Tab 등 딴짓 감지 페널티)
                 if event.type == pygame.WINDOWFOCUSLOST:
                     player.temp_resource = 0
                     print("🚨 딴짓 감지! 임시 자원이 모두 소멸되었습니다.")
                 
+                # 타이머 1초씩 감소 및 자동 파밍 로직
                 if event.type == pygame.USEREVENT:
                     if time_left > 0:
                         time_left -= 1
@@ -74,7 +78,7 @@ def main():
                         else:
                             print("💥 공격력 강화 실패...")
 
-                    # 엔터 키: 보스전으로 이동 (다음 기능)
+                    # 엔터 키: 보스전으로 이동
                     elif event.key == pygame.K_RETURN:
                         print("⚔️ 보스전으로 이동합니다! (다음 단계에서 구현 예정)")
 
@@ -86,6 +90,7 @@ def main():
             seconds = time_left % 60
             time_str = f"{minutes:02d}:{seconds:02d}"
 
+            # 딴짓 경고 문구 및 타이머 UI 그리기
             warning_text = font.render("경고: 창을 벗어나면 임시 자원이 소멸됩니다!", True, (255, 100, 100))
             title_text = font.render("[Phase 1: 집중과 파밍]", True, (255, 255, 255))
             timer_text = font.render(f"남은 시간: {time_str} (스페이스바: 스킵)", True, (100, 255, 100))
@@ -93,27 +98,4 @@ def main():
             
             screen.blit(warning_text, (50, 20))
             screen.blit(title_text, (50, 70))
-            screen.blit(timer_text, (50, 120))
-            screen.blit(info_text, (50, 170))
-
-        elif current_state == "UPGRADE":
-            title_text = font.render("[Phase 2: 대장간 (스탯 강화)]", True, (255, 255, 255))
-            info_text = font.render(f"보유 확정 자원: {player.resource}", True, (255, 215, 0))
-            stat_text = font.render(f"현재 스탯 -> HP: {player.hp} | ATK: {player.atk}", True, (100, 200, 255))
-            
-            guide1 = small_font.render("숫자키 [1] 누르기: 체력 +20 강화 (비용 1, 성공률 70%)", True, (200, 200, 200))
-            guide2 = small_font.render("숫자키 [2] 누르기: 공격력 +5 강화 (비용 1, 성공률 70%)", True, (200, 200, 200))
-            guide_next = small_font.render("Enter키 누르기: 전투하러 가기 (현재 콘솔 출력만)", True, (255, 100, 100))
-
-            screen.blit(title_text, (50, 50))
-            screen.blit(info_text, (50, 100))
-            screen.blit(stat_text, (50, 150))
-            screen.blit(guide1, (50, 250))
-            screen.blit(guide2, (50, 300))
-            screen.blit(guide_next, (50, 400))
-
-        pygame.display.flip()
-        clock.tick(60)
-
-if __name__ == "__main__":
-    main()
+            screen.blit(timer_text
