@@ -4,22 +4,20 @@ import random
 import json
 import os
 
-# 🎵 [신규] 사운드 매니저 클래스 (파일이 없어도 에러 안 나게 안전 처리!)
 class SoundManager:
     def __init__(self):
         pygame.mixer.init()
         self.sounds = {}
-        # 사용할 효과음 이름과 파일명 매칭
-        self.load_sound("click", "click.wav")       # 메뉴 이동, 버튼 클릭
-        self.load_sound("hit", "hit.wav")           # 전투 타격음
-        self.load_sound("upgrade", "upgrade.wav")   # 강화 성공
-        self.load_sound("error", "error.wav")       # 자원 부족 등 에러음
+        self.load_sound("click", "click.wav")       
+        self.load_sound("hit", "hit.wav")           
+        self.load_sound("upgrade", "upgrade.wav")   
+        self.load_sound("error", "error.wav")       
 
     def load_sound(self, name, filename):
         if os.path.exists(filename):
             self.sounds[name] = pygame.mixer.Sound(filename)
         else:
-            self.sounds[name] = None # 파일이 없으면 None으로 안전하게 보관
+            self.sounds[name] = None 
 
     def play(self, name):
         if name in self.sounds and self.sounds[name] is not None:
@@ -104,9 +102,7 @@ def main():
     pygame.display.set_caption("던전모도로 - 집중의 시간")
     clock = pygame.time.Clock()
 
-    # 🎵 사운드 매니저 가동!
     sm = SoundManager()
-
     player = Player()
     stage = load_game(player)
     
@@ -136,8 +132,9 @@ def main():
             # --- 메뉴 화면 ---
             if current_state == "MENU":
                 if event.type == pygame.KEYDOWN:
-                    if event.key in [pygame.K_1, pygame.K_2, pygame.K_3]:
-                        sm.play("click") # 🎵 메뉴 이동 소리
+                    # 💡 [4]번 메뉴가 추가되었으니 사운드 조건에도 추가
+                    if event.key in [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4]:
+                        sm.play("click") 
                     
                     if event.key == pygame.K_1:
                         current_state = "SELECT_DUNGEON" 
@@ -151,12 +148,30 @@ def main():
                         turn = "PLAYER"
                         battle_status = "ONGOING"
                         pygame.time.set_timer(BATTLE_EVENT, 1000)
+                    # 💡 [신규] 4번 누르면 초기화 확인 창으로 이동
+                    elif event.key == pygame.K_4:
+                        current_state = "CONFIRM_RESET"
+
+            # --- 💡 [신규] 초기화 확인 화면 ---
+            elif current_state == "CONFIRM_RESET":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_y:
+                        # 'Y'를 누르면 플레이어 정보와 스테이지를 싹 덮어쓰고 저장
+                        player = Player() 
+                        stage = 1
+                        save_game(player, stage)
+                        sm.play("upgrade") # 초기화 성공 알림음
+                        current_state = "MENU"
+                    elif event.key == pygame.K_n or event.key == pygame.K_ESCAPE:
+                        # 'N'을 누르면 취소하고 메뉴로 돌아감
+                        sm.play("click")
+                        current_state = "MENU"
 
             # --- 던전 선택 화면 ---
             elif current_state == "SELECT_DUNGEON":
                 if event.type == pygame.KEYDOWN:
                     if event.key in [pygame.K_1, pygame.K_2, pygame.K_ESCAPE, pygame.K_RETURN]:
-                        sm.play("click") # 🎵 클릭 소리
+                        sm.play("click")
                         
                     if event.key == pygame.K_1:
                         time_left = 1500 
@@ -173,7 +188,7 @@ def main():
             elif current_state == "TIMER":
                 if event.type == pygame.WINDOWFOCUSLOST:
                     if sum(player.temp_ores) > 0:
-                        sm.play("error") # 🎵 딴짓해서 광물 날아갈 때 에러 소리!
+                        sm.play("error") 
                     player.temp_ores = [0, 0, 0] 
                 
                 if event.type == pygame.USEREVENT:
@@ -196,7 +211,7 @@ def main():
                         player.temp_ores = [0, 0, 0]
                         current_state = "MENU"
                         save_game(player, stage)
-                        sm.play("upgrade") # 🎵 탐험 무사 완료 시 빰빠밤 소리!
+                        sm.play("upgrade")
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
@@ -215,11 +230,11 @@ def main():
                             if random.random() < player.get_success_rate(player.hp_level):
                                 player.max_hp += 20
                                 player.hp_level += 1
-                                sm.play("upgrade") # 🎵 강화 성공!
+                                sm.play("upgrade") 
                             else:
-                                sm.play("hit") # 🎵 강화 실패 깡!
+                                sm.play("hit") 
                         else:
-                            sm.play("error") # 🎵 자원 부족
+                            sm.play("error") 
                     
                     elif event.key == pygame.K_2 and player.atk_level < 30:
                         reqs = get_upgrade_req(player.atk_level)
@@ -230,11 +245,11 @@ def main():
                             if random.random() < player.get_success_rate(player.atk_level):
                                 player.atk += 5
                                 player.atk_level += 1
-                                sm.play("upgrade") # 🎵 강화 성공!
+                                sm.play("upgrade") 
                             else:
-                                sm.play("hit") # 🎵 강화 실패 깡!
+                                sm.play("hit") 
                         else:
-                            sm.play("error") # 🎵 자원 부족
+                            sm.play("error") 
 
                     elif event.key == pygame.K_RETURN:
                         sm.play("click")
@@ -247,12 +262,12 @@ def main():
                     if turn == "PLAYER":
                         boss.current_hp -= player.atk
                         battle_log.append(f"▶ 플레이어의 공격! 보스에게 {player.atk} 피해.")
-                        sm.play("hit") # 🎵 플레이어 공격 소리
+                        sm.play("hit") 
                         
                         if boss.current_hp <= 0:
                             battle_log.append("🏆 보스 처치! (스페이스바: 메뉴로 복귀)")
                             battle_status = "VICTORY"
-                            sm.play("upgrade") # 🎵 승리 팡파레!
+                            sm.play("upgrade") 
                             pygame.time.set_timer(BATTLE_EVENT, 0) 
                         else:
                             turn = "BOSS" 
@@ -260,12 +275,12 @@ def main():
                     elif turn == "BOSS":
                         player.current_hp -= boss.atk
                         battle_log.append(f"▷ 보스의 공격! 플레이어에게 {boss.atk} 피해.")
-                        sm.play("hit") # 🎵 보스 공격 소리
+                        sm.play("hit") 
                         
                         if player.current_hp <= 0:
                             battle_log.append("💀 사망... (스페이스바: 스탯 리셋 후 메뉴 복귀)")
                             battle_status = "DEFEAT"
-                            sm.play("error") # 🎵 패배 소리
+                            sm.play("error") 
                             pygame.time.set_timer(BATTLE_EVENT, 0)
                         else:
                             turn = "PLAYER"
@@ -296,17 +311,37 @@ def main():
             screen.blit(game_title, (280, 60))
             screen.blit(sub_title, (230, 120))
             
-            draw_panel(screen, 150, 200, 500, 320, border_color=(100, 150, 200))
+            # 💡 메뉴가 하나 더 늘었으니 상자 세로 길이를 살짝 키웠어 (320 -> 360)
+            draw_panel(screen, 150, 180, 500, 360, border_color=(100, 150, 200))
             
             menu1 = font.render("[1] 던전 입장 (탐험 지역 선택)", True, (150, 255, 150))
             menu2 = font.render("[2] 대장간 입장", True, (150, 200, 255))
             inventory = small_font.render(f"보유 광물: [{ore_str}]", True, (255, 215, 0))
             menu3 = font.render("[3] 보스전 도전", True, (255, 150, 150))
+            menu4 = font.render("[4] 데이터 초기화 (새로 시작)", True, (150, 150, 150)) # 💡 신규 메뉴
             
-            screen.blit(menu1, (200, 230))
-            screen.blit(menu2, (200, 300))
-            screen.blit(inventory, (240, 340)) 
-            screen.blit(menu3, (200, 410))
+            screen.blit(menu1, (200, 210))
+            screen.blit(menu2, (200, 280))
+            screen.blit(inventory, (240, 320)) 
+            screen.blit(menu3, (200, 390))
+            screen.blit(menu4, (200, 460))
+
+        # 💡 [신규] 초기화 확인 화면 UI 렌더링
+        elif current_state == "CONFIRM_RESET":
+            draw_panel(screen, 150, 200, 500, 220, border_color=(255, 50, 50))
+            
+            warn_title = title_font.render("⚠️ 경고", True, (255, 100, 100))
+            warn_text1 = small_font.render("모든 데이터(광물, 스탯, 진행도)가 영구히 삭제됩니다.", True, (200, 200, 200))
+            warn_text2 = font.render("정말 처음부터 다시 시작하시겠습니까?", True, (255, 255, 255))
+            
+            guide_y = font.render("[Y] 예 (지우기)", True, (255, 100, 100))
+            guide_n = font.render("[N] 아니오 (돌아가기)", True, (100, 255, 100))
+
+            screen.blit(warn_title, (320, 220))
+            screen.blit(warn_text1, (165, 280))
+            screen.blit(warn_text2, (190, 320))
+            screen.blit(guide_y, (180, 380))
+            screen.blit(guide_n, (380, 380))
 
         elif current_state == "SELECT_DUNGEON":
             game_title = title_font.render("목적지 선택", True, (150, 255, 150)) 
