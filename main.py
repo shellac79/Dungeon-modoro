@@ -1,7 +1,7 @@
 import pygame
 import sys
 
-# 1. 플레이어 데이터 클래스 (직관적이고 심플하게 구조화)
+# 1. 플레이어 데이터 클래스
 class Player:
     def __init__(self):
         self.hp = 100
@@ -21,11 +21,8 @@ def main():
     font = pygame.font.SysFont("malgun gothic", 36)
     
     current_state = "TIMER"
+    time_left = 1500 # 25분
     
-    # 타이머 세팅 (25분 = 1500초)
-    time_left = 1500
-    
-    # Pygame의 USEREVENT를 이용해 현실 시간으로 1초(1000ms)마다 이벤트 발생
     pygame.time.set_timer(pygame.USEREVENT, 1000)
 
     while True:
@@ -34,37 +31,39 @@ def main():
                 pygame.quit()
                 sys.exit()
             
-            # 2. 타이머 1초씩 감소 및 자동 파밍 로직
+            # [핵심 추가] 🚨 화면 포커스를 잃었을 때 (Alt+Tab 등 딴짓 감지)
+            if event.type == pygame.WINDOWFOCUSLOST and current_state == "TIMER":
+                player.temp_resource = 0
+                print("🚨 딴짓 감지! 임시 자원이 모두 소멸되었습니다.")
+            
+            # 타이머 1초씩 감소 및 자동 파밍 로직
             if event.type == pygame.USEREVENT and current_state == "TIMER":
                 if time_left > 0:
                     time_left -= 1
                     
-                    # 10초 버틸 때마다 임시 자원 1 획득 (파밍 테스트용)
                     if time_left % 10 == 0:
                         player.temp_resource += 1
                 else:
-                    # 타이머가 0이 되면 휴식/강화 타임으로 넘어갈 예정
                     pass
 
-        # 배경색 칠하기
         screen.fill((40, 40, 40))
 
-        # 3. 화면 렌더링
         if current_state == "TIMER":
-            # 초를 분:초 형식(00:00)으로 예쁘게 변환
             minutes = time_left // 60
             seconds = time_left % 60
             time_str = f"{minutes:02d}:{seconds:02d}"
 
-            # 화면에 띄울 글씨들 렌더링
+            # 딴짓 경고 문구 추가 렌더링
+            warning_text = font.render("경고: 창을 벗어나면 임시 자원이 소멸됩니다!", True, (255, 100, 100)) # 빨간색
+
             title_text = font.render("[Phase 1: 집중과 파밍]", True, (255, 255, 255))
-            timer_text = font.render(f"남은 시간: {time_str}", True, (100, 255, 100)) # 초록색
-            info_text = font.render(f"보유 자원: {player.resource} | 임시 자원: {player.temp_resource}", True, (255, 215, 0)) # 노란색
+            timer_text = font.render(f"남은 시간: {time_str}", True, (100, 255, 100))
+            info_text = font.render(f"보유 자원: {player.resource} | 임시 자원: {player.temp_resource}", True, (255, 215, 0))
             
-            # 실제 화면에 글씨 그리기 (x, y 좌표)
-            screen.blit(title_text, (50, 50))
-            screen.blit(timer_text, (50, 100))
-            screen.blit(info_text, (50, 150))
+            screen.blit(warning_text, (50, 20)) # 맨 위에 빨간색 경고 추가
+            screen.blit(title_text, (50, 70))
+            screen.blit(timer_text, (50, 120))
+            screen.blit(info_text, (50, 170))
 
         pygame.display.flip()
         clock.tick(60)
