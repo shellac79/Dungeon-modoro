@@ -4,7 +4,6 @@ import random
 import json
 import os
 
-# 1. 플레이어 데이터 클래스 
 class Player:
     def __init__(self):
         self.max_hp = 100     
@@ -12,27 +11,25 @@ class Player:
         self.atk = 10
         self.hp_level = 0
         self.atk_level = 0
-        self.resource = 0
-        self.temp_resource = 0
+        self.ores = [0, 0, 0] # 철, 미스릴, 아다만티움
+        self.temp_ores = [0, 0, 0] 
 
     def get_success_rate(self, level):
         if level >= 30:
             return 0.0
         return 1.0 - (level / 29.0) * 0.9
 
-# 2. 보스 몬스터 클래스
 class Boss:
     def __init__(self, stage):
         self.max_hp = 50 + (stage * 50) 
         self.current_hp = self.max_hp
         self.atk = 5 + (stage * 3)      
 
-# 💾 데이터 저장/불러오기 함수
 def save_game(player, stage):
     data = {
         "max_hp": player.max_hp, "atk": player.atk,
         "hp_level": player.hp_level, "atk_level": player.atk_level,
-        "resource": player.resource, "stage": stage
+        "ores": player.ores, "stage": stage
     }
     with open("save_data.json", "w") as f:
         json.dump(data, f)
@@ -45,22 +42,42 @@ def load_game(player):
             player.atk = data.get("atk", 10)
             player.hp_level = data.get("hp_level", 0)
             player.atk_level = data.get("atk_level", 0)
-            player.resource = data.get("resource", 0)
+            player.ores = data.get("ores", [0, 0, 0])
             player.current_hp = player.max_hp
             return data.get("stage", 1)
     return 1 
 
-# 🎨 [UI] 패널(상자) 그리기
 def draw_panel(screen, x, y, w, h, border_color=(100, 100, 100)):
     pygame.draw.rect(screen, (25, 25, 30), (x, y, w, h), border_radius=8)
     pygame.draw.rect(screen, border_color, (x, y, w, h), 3, border_radius=8)
 
-# 🎨 [UI] 체력 바(HP Bar) 그리기
 def draw_hp_bar(screen, x, y, w, h, current_hp, max_hp):
     ratio = max(current_hp / max_hp, 0)
     pygame.draw.rect(screen, (80, 20, 20), (x, y, w, h)) 
     pygame.draw.rect(screen, (40, 180, 40), (x, y, int(w * ratio), h)) 
     pygame.draw.rect(screen, (200, 200, 200), (x, y, w, h), 2) 
+
+# 💡 [핵심 추가 1] 레벨에 따라 다중 광물 요구량을 리스트로 반환하는 함수
+def get_upgrade_req(level):
+    req = [0, 0, 0] # [철, 미스릴, 아다만티움] 필요량
+    if level < 10:
+        req[0] = (level % 10) + 1 # 1~10개
+    elif level < 20:
+        req[0] = 5                # 철 5개 기본
+        req[1] = (level % 10) + 1 # 미스릴 1~10개
+    else:
+        req[0] = 10               # 철 10개 기본
+        req[1] = 5                # 미스릴 5개 기본
+        req[2] = (level % 10) + 1 # 아다만 1~10개
+    return req
+
+# 💡 [핵심 추가 2] 필요 광물 리스트를 예쁜 텍스트로 변환하는 함수
+def req_to_string(req_list):
+    res = []
+    if req_list[0] > 0: res.append(f"철 {req_list[0]}")
+    if req_list[1] > 0: res.append(f"미스릴 {req_list[1]}")
+    if req_list[2] > 0: res.append(f"아다만 {req_list[2]}")
+    return ", ".join(res)
 
 def main():
     pygame.init()
@@ -111,16 +128,24 @@ def main():
             
             elif current_state == "TIMER":
                 if event.type == pygame.WINDOWFOCUSLOST:
-                    player.temp_resource = 0
+                    player.temp_ores = [0, 0, 0] 
                 
                 if event.type == pygame.USEREVENT:
                     if time_left > 0:
                         time_left -= 1
                         if time_left % 10 == 0:
-                            player.temp_resource += 10 
+                            for _ in range(5):
+                                roll = random.randint(1, 100)
+                                if roll <= 60:
+                                    player.temp_ores[0] += 1 
+                                elif roll <= 90:
+                                    player.temp_ores[1] += 1 
+                                else:
+                                    player.temp_ores[2] += 1 
                     else:
-                        player.resource += player.temp_resource
-                        player.temp_resource = 0
+                        for i in range(3):
+                            player.ores[i] += player.temp_ores[i]
+                        player.temp_ores = [0, 0, 0]
                         current_state = "MENU"
                         save_game(player, stage)
 
@@ -130,16 +155,25 @@ def main():
 
             elif current_state == "UPGRADE":
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_1 and player.resource >= 1:
-                        if player.hp_level < 30:
-                            player.resource -= 1
+                    # 💡 [로직 수정] 1번: 다중 자원 소모 체크 및 체력 강화
+                    if event.key == pygame.K_1 and player.hp_level < 30:
+                        reqs = get_upgrade_req(player.hp_level)
+                        # 보유량이 필요량보다 모두 같거나 큰지 확인
+                        if player.ores[0] >= reqs[0] and player.ores[1] >= reqs[1] and player.ores[2] >= reqs[2]:
+                            player.ores[0] -= reqs[0]
+                            player.ores[1] -= reqs[1]
+                            player.ores[2] -= reqs[2]
                             if random.random() < player.get_success_rate(player.hp_level):
                                 player.max_hp += 20
                                 player.hp_level += 1
                     
-                    elif event.key == pygame.K_2 and player.resource >= 1:
-                        if player.atk_level < 30:
-                            player.resource -= 1
+                    # 💡 [로직 수정] 2번: 다중 자원 소모 체크 및 공격력 강화
+                    elif event.key == pygame.K_2 and player.atk_level < 30:
+                        reqs = get_upgrade_req(player.atk_level)
+                        if player.ores[0] >= reqs[0] and player.ores[1] >= reqs[1] and player.ores[2] >= reqs[2]:
+                            player.ores[0] -= reqs[0]
+                            player.ores[1] -= reqs[1]
+                            player.ores[2] -= reqs[2]
                             if random.random() < player.get_success_rate(player.atk_level):
                                 player.atk += 5
                                 player.atk_level += 1
@@ -164,7 +198,7 @@ def main():
                         player.current_hp -= boss.atk
                         battle_log.append(f"▷ 보스의 공격! 플레이어에게 {boss.atk} 피해.")
                         if player.current_hp <= 0:
-                            battle_log.append("💀 사망... (스페이스바: 메뉴로 복귀)")
+                            battle_log.append("💀 사망... (스페이스바: 스탯 리셋 후 메뉴 복귀)")
                             battle_status = "DEFEAT"
                             pygame.time.set_timer(BATTLE_EVENT, 0)
                         else:
@@ -183,25 +217,28 @@ def main():
                         current_state = "MENU"
                         save_game(player, stage)
 
-
         # --- 🎨 화면 렌더링 ---
         screen.fill((15, 15, 20)) 
+        
+        ore_str = f"철 {player.ores[0]} | 미스릴 {player.ores[1]} | 아다만 {player.ores[2]}"
+        temp_ore_str = f"철 {player.temp_ores[0]} | 미스릴 {player.temp_ores[1]} | 아다만 {player.temp_ores[2]}"
 
         if current_state == "MENU":
             game_title = title_font.render("던전모도로", True, (220, 220, 220)) 
             sub_title = font.render(f"- 집중의 시간 | 스테이지 {stage} -", True, (150, 150, 150))
-            
             screen.blit(game_title, (280, 60))
             screen.blit(sub_title, (230, 120))
             
             draw_panel(screen, 150, 200, 500, 320, border_color=(100, 150, 200))
             
             menu1 = font.render("[1] 탐험 시작 (25분 집중 파밍)", True, (150, 255, 150))
-            menu2 = font.render(f"[2] 대장간 입장 (보유 자원: {player.resource})", True, (150, 200, 255))
+            menu2 = font.render("[2] 대장간 입장", True, (150, 200, 255))
+            inventory = small_font.render(f"보유 광물: [{ore_str}]", True, (255, 215, 0))
             menu3 = font.render("[3] 보스전 도전", True, (255, 150, 150))
             
-            screen.blit(menu1, (200, 250))
-            screen.blit(menu2, (200, 330))
+            screen.blit(menu1, (200, 230))
+            screen.blit(menu2, (200, 300))
+            screen.blit(inventory, (240, 340)) 
             screen.blit(menu3, (200, 410))
 
         elif current_state == "TIMER":
@@ -213,38 +250,46 @@ def main():
 
             title_text = title_font.render(f"스테이지 {stage} 탐험 중", True, (255, 255, 255))
             timer_text = title_font.render(f"⏳ {time_str}", True, (100, 255, 100))
-            info_text = font.render(f"확정 자원: {player.resource}  |  임시 자원: {player.temp_resource}", True, (255, 215, 0))
-            warning_text = small_font.render("경고: 창을 벗어나면 임시 자원이 소멸됩니다!", True, (255, 100, 100))
             
-            screen.blit(title_text, (220, 160))
-            screen.blit(timer_text, (310, 240))
-            screen.blit(info_text, (200, 330))
-            screen.blit(warning_text, (200, 410))
+            info_text = small_font.render(f"창고: [{ore_str}]", True, (200, 200, 200))
+            temp_text = font.render(f"가방(임시): [{temp_ore_str}]", True, (255, 215, 0))
+            warning_text = small_font.render("경고: 창을 벗어나면 가방 안의 광물이 모두 증발합니다!", True, (255, 100, 100))
+            
+            screen.blit(title_text, (220, 150))
+            screen.blit(timer_text, (310, 220))
+            screen.blit(info_text, (180, 300))
+            screen.blit(temp_text, (180, 340))
+            screen.blit(warning_text, (160, 420))
 
-            # 💡 [추가] 오른쪽 아래 스페이스바 스킵 힌트 (어두운 색으로 은은하게)
             skip_hint = small_font.render("[Space] 0초 스킵 (테스트용)", True, (100, 100, 100))
             screen.blit(skip_hint, (550, 560))
 
         elif current_state == "UPGRADE":
-            draw_panel(screen, 50, 50, 700, 140, border_color=(150, 200, 255))
-            title_text = font.render(f"[ 대장간 ]   보유 자원: {player.resource}", True, (255, 215, 0))
+            draw_panel(screen, 30, 50, 740, 140, border_color=(150, 200, 255))
+            title_text = font.render(f"[ 대장간 ] 광물: {ore_str}", True, (255, 215, 0))
             stat_text = font.render(f"현재 스탯 ➡️ HP: {player.max_hp} (Lv.{player.hp_level}) | ATK: {player.atk} (Lv.{player.atk_level})", True, (200, 220, 255))
-            screen.blit(title_text, (80, 75))
-            screen.blit(stat_text, (80, 130))
+            screen.blit(title_text, (60, 75))
+            screen.blit(stat_text, (60, 130))
 
-            draw_panel(screen, 50, 220, 700, 320, border_color=(100, 100, 150))
+            # 💡 패널을 살짝 키워서 긴 글자도 다 들어가게 수정
+            draw_panel(screen, 30, 220, 740, 320, border_color=(100, 100, 150))
+            
+            hp_req_str = req_to_string(get_upgrade_req(player.hp_level))
+            atk_req_str = req_to_string(get_upgrade_req(player.atk_level))
+            
             hp_prob = player.get_success_rate(player.hp_level) * 100
             atk_prob = player.get_success_rate(player.atk_level) * 100
-            hp_guide_str = "MAX" if player.hp_level >= 30 else f"확률 {hp_prob:.1f}%"
-            atk_guide_str = "MAX" if player.atk_level >= 30 else f"확률 {atk_prob:.1f}%"
+            
+            hp_guide_str = "MAX" if player.hp_level >= 30 else f"비용: [{hp_req_str}] | 확률 {hp_prob:.1f}%"
+            atk_guide_str = "MAX" if player.atk_level >= 30 else f"비용: [{atk_req_str}] | 확률 {atk_prob:.1f}%"
 
-            guide1 = font.render(f"숫자키 [1]: 체력 +20 강화 (비용 1, {hp_guide_str})", True, (220, 220, 220))
-            guide2 = font.render(f"숫자키 [2]: 공격력 +5 강화 (비용 1, {atk_guide_str})", True, (220, 220, 220))
+            guide1 = font.render(f"숫자키 [1]: 체력 +20 강화 ({hp_guide_str})", True, (220, 220, 220))
+            guide2 = font.render(f"숫자키 [2]: 공격력 +5 강화 ({atk_guide_str})", True, (220, 220, 220))
             guide_next = font.render("Enter키 누르기: 메뉴로 돌아가기", True, (255, 100, 100))
 
-            screen.blit(guide1, (80, 270))
-            screen.blit(guide2, (80, 350))
-            screen.blit(guide_next, (80, 450))
+            screen.blit(guide1, (50, 270))
+            screen.blit(guide2, (50, 350))
+            screen.blit(guide_next, (50, 450))
 
         elif current_state == "BATTLE":
             draw_panel(screen, 40, 40, 340, 180, border_color=(100, 200, 255))
