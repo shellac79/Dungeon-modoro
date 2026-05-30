@@ -12,7 +12,6 @@ class SoundManager:
         self.load_sound("hit", "hit.wav")           
         self.load_sound("upgrade", "upgrade.wav")   
         self.load_sound("error", "error.wav")       
-        # self.load_sound("alarm", "alarm.wav") # 알람 소리를 추가했다면 주석 해제!
 
     def load_sound(self, name, filename):
         if os.path.exists(filename):
@@ -102,6 +101,23 @@ def req_to_string(req_list):
     if req_list[2] > 0: res.append(f"아다만 {req_list[2]}")
     return ", ".join(res)
 
+def get_valid_font(size, bold=False):
+    """💡 폰트 파일이 없어도 기본 폰트에서 최대한 깔끔하게 나오도록 보장"""
+    font_path = "font.ttf"
+    if os.path.exists(font_path):
+        try:
+            return pygame.font.Font(font_path, size)
+        except:
+            pass
+            
+    available = pygame.font.get_fonts()
+    ko_candidates = ["malgungothic", "nanumgothic", "gulim", "dotum"]
+    for name in ko_candidates:
+        if name in available:
+            return pygame.font.SysFont(name, size, bold=bold)
+            
+    return pygame.font.SysFont(None, size, bold=bold)
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode((800, 600))
@@ -112,9 +128,10 @@ def main():
     player = Player()
     stage = load_game(player)
     
-    font = pygame.font.SysFont("malgun gothic", 26)
-    small_font = pygame.font.SysFont("malgun gothic", 20)
-    title_font = pygame.font.SysFont("malgun gothic", 46, bold=True)
+    # 💡 폰트 크기 시원하게 원상복구 및 확대!
+    font = get_valid_font(24)
+    small_font = get_valid_font(20)
+    title_font = get_valid_font(40, bold=True)
     
     current_state = "MENU"
     time_left = 0 
@@ -207,7 +224,7 @@ def main():
                                     elif roll <= 80: player.temp_ores[1] += 1 
                                     else: player.temp_ores[2] += 1 
                     else:
-                        sm.play("upgrade") # 알람 소리를 넣었다면 "alarm"으로 변경
+                        sm.play("upgrade") 
                         current_state = "EXPLORATION_DONE"
 
                 if event.type == pygame.KEYDOWN:
@@ -225,7 +242,6 @@ def main():
                         player.ores[i] += earned
                     player.temp_ores = [0, 0, 0]
                     
-                    # 💡 던전 타입에 따라 휴식 시간 다르게 설정 (1=5분, 2=10분)
                     time_left = 300 if dungeon_type == 1 else 600 
                     current_state = "INN_TIMER"
 
@@ -350,48 +366,51 @@ def main():
         if current_state == "MENU":
             game_title = title_font.render("던전모도로", True, (220, 220, 220)) 
             sub_title = font.render(f"- 집중의 시간 | 스테이지 {stage} -", True, (150, 150, 150))
-            screen.blit(game_title, (280, 60))
-            screen.blit(sub_title, (230, 120))
+            screen.blit(game_title, (290, 50))
+            screen.blit(sub_title, (240, 110))
             
-            draw_panel(screen, 130, 170, 540, 390, border_color=(100, 150, 200))
+            draw_panel(screen, 80, 170, 640, 390, border_color=(100, 150, 200))
             
             menu1 = font.render("[1] 던전 입장 (탐험 지역 선택)", True, (150, 255, 150))
             menu2 = font.render("[2] 대장간 입장", True, (150, 200, 255))
             inventory = small_font.render(f"보유 광물: [{ore_str}]", True, (255, 215, 0))
             hp_info = small_font.render(f"현재 체력: {player.current_hp}/{player.max_hp} (휴식으로만 회복!)", True, (255, 100, 100))
             menu3 = font.render("[3] 보스전 도전", True, (255, 150, 150))
-            menu4 = font.render("[4] 데이터 초기화 (새로 시작)", True, (150, 150, 150))
+            menu4 = font.render("[4] 데이터 초기화 (새로 시작)", True, (160, 160, 160))
             
-            screen.blit(menu1, (180, 190))
-            screen.blit(menu2, (180, 250))
-            screen.blit(inventory, (220, 290)) 
-            screen.blit(hp_info, (220, 320))
-            screen.blit(menu3, (180, 390))
-            screen.blit(menu4, (180, 460))
+            screen.blit(menu1, (120, 190))
+            screen.blit(menu2, (120, 250))
+            screen.blit(inventory, (160, 290)) 
+            screen.blit(hp_info, (160, 320))
+            screen.blit(menu3, (120, 390))
+            screen.blit(menu4, (120, 460))
 
         elif current_state == "CONFIRM_RESET":
-            draw_panel(screen, 150, 200, 500, 220, border_color=(255, 50, 50))
+            draw_panel(screen, 80, 200, 640, 220, border_color=(255, 50, 50))
+            
             warn_title = title_font.render("⚠️ 경고", True, (255, 100, 100))
             warn_text1 = small_font.render("모든 데이터(광물, 스탯, 진행도)가 영구히 삭제됩니다.", True, (200, 200, 200))
             warn_text2 = font.render("정말 처음부터 다시 시작하시겠습니까?", True, (255, 255, 255))
+            
             guide_y = font.render("[Y] 예 (지우기)", True, (255, 100, 100))
             guide_n = font.render("[N] 아니오 (돌아가기)", True, (100, 255, 100))
 
-            screen.blit(warn_title, (320, 220))
-            screen.blit(warn_text1, (165, 280))
-            screen.blit(warn_text2, (190, 320))
-            screen.blit(guide_y, (180, 380))
-            screen.blit(guide_n, (380, 380))
+            screen.blit(warn_title, (330, 215))
+            screen.blit(warn_text1, (140, 275))
+            screen.blit(warn_text2, (170, 315))
+            screen.blit(guide_y, (180, 370))
+            screen.blit(guide_n, (440, 370))
 
         elif current_state == "SELECT_DUNGEON":
             game_title = title_font.render("목적지 선택", True, (150, 255, 150)) 
             sub_title = font.render("어디로 탐험을 떠나시겠습니까?", True, (150, 150, 150))
-            screen.blit(game_title, (270, 60))
-            screen.blit(sub_title, (220, 130))
+            screen.blit(game_title, (290, 50))
+            screen.blit(sub_title, (240, 120))
             
-            draw_panel(screen, 100, 200, 600, 320, border_color=(150, 255, 150))
+            draw_panel(screen, 40, 180, 720, 350, border_color=(150, 255, 150))
             
-            dun1_title = font.render("[1] 얕은 숲 (25분 집중)", True, (200, 255, 200))
+            # 💡 '얕은 숲'을 '고요한 숲'으로 변경해서 버그 원천 차단!
+            dun1_title = font.render("[1] 고요한 숲 (25분 집중)", True, (200, 255, 200))
             dun1_desc = small_font.render("기본적인 철광석 위주로 안전하게 파밍합니다.", True, (150, 150, 150))
             
             dun2_title = font.render("[2] 심연의 동굴 (50분 딥워크)", True, (255, 150, 255))
@@ -399,17 +418,20 @@ def main():
             
             cancel_txt = small_font.render("[Enter] 마을로 돌아가기", True, (150, 150, 150))
             
-            screen.blit(dun1_title, (140, 230))
-            screen.blit(dun1_desc, (170, 270))
-            screen.blit(dun2_title, (140, 340))
-            screen.blit(dun2_desc, (170, 380))
-            screen.blit(cancel_txt, (500, 470))
+            screen.blit(dun1_title, (70, 210))
+            screen.blit(dun1_desc, (100, 250))
+            
+            screen.blit(dun2_title, (70, 320))
+            screen.blit(dun2_desc, (100, 360))
+            
+            screen.blit(cancel_txt, (550, 480))
 
         elif current_state == "TIMER":
-            dungeon_name = "얕은 숲" if dungeon_type == 1 else "심연의 동굴"
+            # 💡 이름 동기화 변경
+            dungeon_name = "고요한 숲" if dungeon_type == 1 else "심연의 동굴"
             border_col = (100, 255, 100) if dungeon_type == 1 else (200, 100, 255)
             
-            draw_panel(screen, 120, 120, 560, 350, border_color=border_col)
+            draw_panel(screen, 40, 120, 720, 390, border_color=border_col)
             
             minutes = time_left // 60
             seconds = time_left % 60
@@ -421,36 +443,35 @@ def main():
             
             info_text = small_font.render(f"창고: [{ore_str}]", True, (200, 200, 200))
             temp_text = font.render(f"가방(임시): [{temp_ore_str}]", True, (255, 215, 0))
-            warning_text = small_font.render("경고: 창을 벗어나면 가방 안의 광물이 모두 증발합니다!", True, (255, 100, 100))
+            warning_text = small_font.render("경고: 창을 벗어나면 가방 안의 광물들이 증발합니다!", True, (255, 100, 100))
             
-            screen.blit(title_text, (200, 150))
-            screen.blit(timer_text, (310, 220))
-            screen.blit(info_text, (180, 300))
-            screen.blit(temp_text, (180, 340))
-            screen.blit(warning_text, (160, 420))
+            screen.blit(title_text, (70, 150))
+            screen.blit(timer_text, (340, 220))
+            screen.blit(info_text, (80, 300))
+            screen.blit(temp_text, (80, 340))
+            screen.blit(warning_text, (80, 420))
 
-            skip_hint = small_font.render("[Space] 0초 스킵 (테스트용)", True, (100, 100, 100))
-            screen.blit(skip_hint, (550, 560))
+            skip_hint = small_font.render("[Space] 스킵 (테스트)", True, (100, 100, 100))
+            screen.blit(skip_hint, (610, 550))
 
         elif current_state == "EXPLORATION_DONE":
-            draw_panel(screen, 150, 150, 500, 300, border_color=(255, 215, 0))
+            draw_panel(screen, 40, 140, 720, 350, border_color=(255, 215, 0))
             done_title = title_font.render("🎉 탐험 완료!", True, (255, 215, 0))
             
             bonus_rate = int(player.combo * 10)
             bonus_text = font.render(f"현재 획득 예정 자원 (콤보 보너스 +{bonus_rate}%)", True, (200, 255, 200))
             ore_text = font.render(f"[{temp_ore_str}]", True, (255, 255, 255))
             
-            # 💡 던전 타입에 맞춰 5분/10분 글씨 변경
             rest_min = 5 if dungeon_type == 1 else 10
-            done_desc = small_font.render(f"▶ 스페이스바를 눌러 여관으로 이동 ({rest_min}분 휴식)", True, (150, 150, 150))
+            done_desc = font.render(f"▶ 스페이스바를 눌러 여관으로 이동 ({rest_min}분 휴식)", True, (160, 160, 255))
             
-            screen.blit(done_title, (280, 180))
-            screen.blit(bonus_text, (190, 250))
-            screen.blit(ore_text, (190, 290))
-            screen.blit(done_desc, (170, 380)) 
+            screen.blit(done_title, (300, 170))
+            screen.blit(bonus_text, (80, 240))
+            screen.blit(ore_text, (80, 280))
+            screen.blit(done_desc, (80, 380)) 
 
         elif current_state == "INN_TIMER":
-            draw_panel(screen, 150, 150, 500, 300, border_color=(100, 255, 100))
+            draw_panel(screen, 40, 140, 720, 350, border_color=(100, 255, 100))
             minutes = time_left // 60
             seconds = time_left % 60
             inn_title = title_font.render("☕ 여관에서 휴식 중", True, (255, 255, 255))
@@ -458,32 +479,32 @@ def main():
             
             hp_text = small_font.render(f"체력 회복 중... {player.current_hp}/{player.max_hp}", True, (255, 150, 150))
             
-            screen.blit(inn_title, (230, 180))
-            screen.blit(time_render, (330, 250))
-            screen.blit(hp_text, (260, 320))
-            draw_hp_bar(screen, 250, 350, 300, 20, player.current_hp, player.max_hp)
+            screen.blit(inn_title, (270, 170))
+            screen.blit(time_render, (340, 240))
+            screen.blit(hp_text, (70, 315))
+            draw_hp_bar(screen, 70, 345, 660, 20, player.current_hp, player.max_hp)
 
-            skip_hint = small_font.render("[Space] 휴식 0초 스킵", True, (100, 100, 100))
-            screen.blit(skip_hint, (530, 420))
+            skip_hint = small_font.render("[Space] 휴식 스킵", True, (100, 100, 100))
+            screen.blit(skip_hint, (650, 420))
 
         elif current_state == "INN_CHOICE":
-            draw_panel(screen, 100, 180, 600, 260, border_color=(200, 200, 255))
-            choice_title = title_font.render("휴식 완료!", True, (200, 200, 255))
+            draw_panel(screen, 40, 170, 720, 280, border_color=(200, 200, 255))
+            choice_title = title_font.render("휴식 완료!", True, (200, 200, 200))
             
             next_bonus = int((player.combo + 1) * 10)
             c1 = font.render(f"[1] 연전 돌입! (다음 던전 자원 보너스 +{next_bonus}%)", True, (255, 215, 0))
-            c2 = font.render("[2] 마을로 돌아가기 (콤보 초기화 및 저장)", True, (150, 150, 150))
+            c2 = font.render("[2] 마을로 돌아가기 (콤보 초기화 및 저장)", True, (160, 160, 160))
             
-            screen.blit(choice_title, (310, 210))
-            screen.blit(c1, (130, 290))
-            screen.blit(c2, (130, 360))
+            screen.blit(choice_title, (320, 200))
+            screen.blit(c1, (80, 280))
+            screen.blit(c2, (80, 350))
 
         elif current_state == "UPGRADE":
-            draw_panel(screen, 30, 50, 740, 140, border_color=(150, 200, 255))
+            draw_panel(screen, 30, 40, 740, 150, border_color=(150, 200, 255))
             title_text = font.render(f"[ 대장간 ] 광물: {ore_str}", True, (255, 215, 0))
             stat_text = font.render(f"현재 스탯 ➡️ HP: {player.max_hp} (Lv.{player.hp_level}) | ATK: {player.atk} (Lv.{player.atk_level})", True, (200, 220, 255))
-            screen.blit(title_text, (60, 75))
-            screen.blit(stat_text, (60, 130))
+            screen.blit(title_text, (50, 65))
+            screen.blit(stat_text, (50, 120))
 
             draw_panel(screen, 30, 220, 740, 320, border_color=(100, 100, 150))
             
@@ -500,8 +521,8 @@ def main():
             guide2 = font.render(f"숫자키 [2]: 공격력 +5 강화 ({atk_guide_str})", True, (220, 220, 220))
             guide_next = font.render("Enter키 누르기: 메뉴로 돌아가기", True, (255, 100, 100))
 
-            screen.blit(guide1, (50, 270))
-            screen.blit(guide2, (50, 350))
+            screen.blit(guide1, (50, 260))
+            screen.blit(guide2, (50, 340))
             screen.blit(guide_next, (50, 450))
 
         elif current_state == "BATTLE":
