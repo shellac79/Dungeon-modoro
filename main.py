@@ -13,9 +13,8 @@ class SoundManager:
         self.load_sound("upgrade", "upgrade.wav")   
         self.load_sound("error", "error.wav")       
         
-        # 💡 [신규] BGM 상태 관리를 위한 변수들
-        self.bgm_volume = 0.5  # 기본 볼륨 50%
-        self.is_bgm_on = True  # BGM 켜짐/꺼짐 상태
+        self.bgm_volume = 0.5  
+        self.is_bgm_on = True  
 
     def load_sound(self, name, filename):
         if os.path.exists(filename):
@@ -30,7 +29,6 @@ class SoundManager:
             else:
                 self.sounds[name].play()
 
-    # 💡 [업데이트] BGM 재생, 정지, 볼륨 조절, 토글 기능 추가
     def play_bgm(self, filename):
         if os.path.exists(filename) and self.is_bgm_on:
             try:
@@ -52,7 +50,6 @@ class SoundManager:
 
     def change_volume(self, delta):
         self.bgm_volume += delta
-        # 볼륨은 0.0(0%) ~ 1.0(100%) 사이를 벗어나지 않게 고정
         self.bgm_volume = max(0.0, min(1.0, self.bgm_volume)) 
         pygame.mixer.music.set_volume(self.bgm_volume)
 
@@ -77,6 +74,27 @@ class Boss:
         self.max_hp = 50 + (stage * 50) 
         self.current_hp = self.max_hp
         self.atk = 5 + (stage * 3)      
+
+# 💡 [신규 UX] 허공으로 떠오르며 사라지는 데미지 텍스트 클래스
+class FloatingText:
+    def __init__(self, text, x, y, color, font):
+        self.text = text
+        self.x = x
+        self.y = y
+        self.color = color
+        self.font = font
+        self.alpha = 255
+        self.velocity = -2  # 위로 올라가는 속도
+        
+    def update(self):
+        self.y += self.velocity
+        self.alpha -= 5  # 서서히 투명해짐
+        
+    def draw(self, screen):
+        if self.alpha > 0:
+            surf = self.font.render(self.text, True, self.color)
+            surf.set_alpha(max(0, self.alpha))
+            screen.blit(surf, (self.x, self.y))
 
 def save_game(player, stage):
     data = {
@@ -164,7 +182,7 @@ def main():
     current_state = "MENU"
     time_left = 0 
     dungeon_type = 1 
-    current_bgm_file = "" # 💡 [신규] 현재 재생 중인 음악을 기억하는 변수
+    current_bgm_file = "" 
     
     pygame.time.set_timer(pygame.USEREVENT, 1000)
     BATTLE_EVENT = pygame.USEREVENT + 1
@@ -173,6 +191,20 @@ def main():
     battle_log = []
     turn = "PLAYER"
     battle_status = "ONGOING" 
+    
+    # 💡 [신규 UX] 파티클 및 화면 페이드(화면 전환) 관리 변수
+    floating_texts = []
+    fade_alpha = 0
+    fade_dir = 0  # 1: 어두워짐(Fade-out), -1: 밝아짐(Fade-in), 0: 안함
+    next_state = ""
+    fade_surface = pygame.Surface((800, 600))
+    fade_surface.fill((0, 0, 0))
+
+    # 💡 [신규 UX] 즉시 화면이 안 넘어가고 페이드 아웃을 거치도록 돕는 헬퍼 함수
+    def change_state_with_fade(new_state):
+        nonlocal next_state, fade_dir
+        next_state = new_state
+        fade_dir = 1 
 
     while True:
         for event in pygame.event.get():
@@ -181,24 +213,28 @@ def main():
                 pygame.quit()
                 sys.exit()
 
+            # 🚨 화면이 어두워지고 밝아지는 페이드 효과 중에는 키보드 입력을 무시함! (오류 방지)
+            if event.type == pygame.KEYDOWN and fade_dir != 0:
+                continue
+
             if current_state == "MENU":
                 if event.type == pygame.KEYDOWN:
                     if event.key in [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4]:
                         sm.play("click") 
                     
                     if event.key == pygame.K_1:
-                        current_state = "SELECT_DUNGEON" 
+                        change_state_with_fade("SELECT_DUNGEON") 
                     elif event.key == pygame.K_2:
-                        current_state = "UPGRADE"
+                        change_state_with_fade("UPGRADE")
                     elif event.key == pygame.K_3:
-                        current_state = "BATTLE"
                         boss = Boss(stage)
                         battle_log = [f"--- 스테이지 {stage} 보스전 시작! ---"]
                         turn = "PLAYER"
                         battle_status = "ONGOING"
                         pygame.time.set_timer(BATTLE_EVENT, 1000)
+                        change_state_with_fade("BATTLE")
                     elif event.key == pygame.K_4:
-                        current_state = "CONFIRM_RESET"
+                        change_state_with_fade("CONFIRM_RESET")
 
             elif current_state == "CONFIRM_RESET":
                 if event.type == pygame.KEYDOWN:
@@ -207,10 +243,10 @@ def main():
                         stage = 1
                         save_game(player, stage)
                         sm.play("upgrade") 
-                        current_state = "MENU"
+                        change_state_with_fade("MENU")
                     elif event.key == pygame.K_n or event.key == pygame.K_ESCAPE:
                         sm.play("click")
-                        current_state = "MENU"
+                        change_state_with_fade("MENU")
 
             elif current_state == "SELECT_DUNGEON":
                 if event.type == pygame.KEYDOWN:
@@ -222,16 +258,16 @@ def main():
                         dungeon_type = 1
                         current_bgm_file = "bgm_forest.mp3"
                         sm.play_bgm(current_bgm_file) 
-                        current_state = "TIMER"
+                        change_state_with_fade("TIMER")
                     elif event.key == pygame.K_2:
                         time_left = 3000 
                         dungeon_type = 2
                         current_bgm_file = "bgm_cave.mp3"
                         sm.play_bgm(current_bgm_file)
-                        current_state = "TIMER"
+                        change_state_with_fade("TIMER")
                     elif event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
                         player.combo = 0 
-                        current_state = "MENU" 
+                        change_state_with_fade("MENU") 
             
             elif current_state == "TIMER":
                 if event.type == pygame.WINDOWFOCUSLOST:
@@ -256,20 +292,19 @@ def main():
                     else:
                         sm.stop_bgm() 
                         sm.play("upgrade") 
-                        current_state = "EXPLORATION_DONE"
+                        change_state_with_fade("EXPLORATION_DONE")
 
                 if event.type == pygame.KEYDOWN:
-                    # 💡 [신규] BGM 컨트롤 단축키 (M: 켜기/끄기, 위/아래: 볼륨)
                     if event.key == pygame.K_m:
                         sm.toggle_bgm(current_bgm_file)
                     elif event.key == pygame.K_UP:
-                        sm.change_volume(0.1) # 10% 증가
+                        sm.change_volume(0.1) 
                     elif event.key == pygame.K_DOWN:
-                        sm.change_volume(-0.1) # 10% 감소
+                        sm.change_volume(-0.1) 
                     elif event.key == pygame.K_SPACE:
                         sm.stop_bgm()
                         sm.play("upgrade")
-                        current_state = "EXPLORATION_DONE" 
+                        change_state_with_fade("EXPLORATION_DONE") 
 
             elif current_state == "EXPLORATION_DONE":
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
@@ -281,7 +316,7 @@ def main():
                     player.temp_ores = [0, 0, 0]
                     
                     time_left = 300 if dungeon_type == 1 else 600 
-                    current_state = "INN_TIMER"
+                    change_state_with_fade("INN_TIMER")
 
             elif current_state == "INN_TIMER":
                 if event.type == pygame.USEREVENT:
@@ -290,26 +325,30 @@ def main():
                         heal_amount = max(1, player.max_hp // 300)
                         if player.current_hp < player.max_hp:
                             player.current_hp = min(player.max_hp, player.current_hp + heal_amount)
+                            # 💡 [신규 UX] 여관에서 체력이 차오를 때 초록색 + 힐링 텍스트 파티클 생성!
+                            rx = random.randint(350, 450)
+                            ry = random.randint(280, 310)
+                            floating_texts.append(FloatingText(f"+{heal_amount}", rx, ry, (50, 255, 50), title_font))
                     else:
                         sm.play("upgrade")
-                        current_state = "INN_CHOICE"
+                        change_state_with_fade("INN_CHOICE")
 
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     sm.play("click")
                     player.current_hp = player.max_hp 
-                    current_state = "INN_CHOICE"
+                    change_state_with_fade("INN_CHOICE")
 
             elif current_state == "INN_CHOICE":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1:
                         sm.play("click")
                         player.combo += 1 
-                        current_state = "SELECT_DUNGEON" 
+                        change_state_with_fade("SELECT_DUNGEON") 
                     elif event.key == pygame.K_2:
                         sm.play("click")
                         player.combo = 0 
                         save_game(player, stage)
-                        current_state = "MENU"
+                        change_state_with_fade("MENU")
 
             elif current_state == "UPGRADE":
                 if event.type == pygame.KEYDOWN:
@@ -346,15 +385,21 @@ def main():
 
                     elif event.key == pygame.K_RETURN:
                         sm.play("click")
-                        current_state = "MENU"
                         save_game(player, stage)
+                        change_state_with_fade("MENU")
 
             elif current_state == "BATTLE":
                 if event.type == BATTLE_EVENT and battle_status == "ONGOING":
                     if turn == "PLAYER":
-                        boss.current_hp -= player.atk
-                        battle_log.append(f"▶ 플레이어의 공격! 보스에게 {player.atk} 피해.")
+                        damage = player.atk
+                        boss.current_hp -= damage
+                        battle_log.append(f"▶ 플레이어의 공격! 보스에게 {damage} 피해.")
                         sm.play("hit") 
+                        
+                        # 💡 [신규 UX] 보스(오른쪽 패널) 머리 위에 데미지 텍스트 띄우기
+                        rx = random.randint(550, 630)
+                        ry = random.randint(60, 100)
+                        floating_texts.append(FloatingText(f"-{damage}", rx, ry, (255, 50, 50), title_font))
                         
                         if boss.current_hp <= 0:
                             battle_log.append("🏆 보스 처치! (스페이스바: 메뉴로 복귀)")
@@ -365,9 +410,15 @@ def main():
                             turn = "BOSS" 
                             
                     elif turn == "BOSS":
-                        player.current_hp -= boss.atk
-                        battle_log.append(f"▷ 보스의 공격! 플레이어에게 {boss.atk} 피해.")
+                        damage = boss.atk
+                        player.current_hp -= damage
+                        battle_log.append(f"▷ 보스의 공격! 플레이어에게 {damage} 피해.")
                         sm.play("hit") 
+                        
+                        # 💡 [신규 UX] 플레이어(왼쪽 패널) 머리 위에 데미지 텍스트 띄우기
+                        rx = random.randint(170, 250)
+                        ry = random.randint(60, 100)
+                        floating_texts.append(FloatingText(f"-{damage}", rx, ry, (255, 50, 50), title_font))
                         
                         if player.current_hp <= 0:
                             battle_log.append("💀 사망... (스페이스바: 스탯 리셋 후 메뉴 복귀)")
@@ -388,8 +439,8 @@ def main():
                         elif battle_status == "DEFEAT":
                             player = Player() 
                             stage = 1
-                        current_state = "MENU"
                         save_game(player, stage)
+                        change_state_with_fade("MENU")
 
         # --- 🎨 화면 렌더링 ---
         screen.fill((15, 15, 20)) 
@@ -421,11 +472,9 @@ def main():
 
         elif current_state == "CONFIRM_RESET":
             draw_panel(screen, 80, 200, 640, 220, border_color=(255, 50, 50))
-            
             warn_title = title_font.render("⚠️ 경고", True, (255, 100, 100))
             warn_text1 = small_font.render("모든 데이터(광물, 스탯, 진행도)가 영구히 삭제됩니다.", True, (200, 200, 200))
             warn_text2 = font.render("정말 처음부터 다시 시작하시겠습니까?", True, (255, 255, 255))
-            
             guide_y = font.render("[Y] 예 (지우기)", True, (255, 100, 100))
             guide_n = font.render("[N] 아니오 (돌아가기)", True, (100, 255, 100))
 
@@ -440,31 +489,22 @@ def main():
             sub_title = font.render("어디로 탐험을 떠나시겠습니까?", True, (150, 150, 150))
             screen.blit(game_title, (300, 50))
             screen.blit(sub_title, (250, 120))
-            
             draw_panel(screen, 40, 180, 720, 350, border_color=(150, 255, 150))
-            
             dun1_title = font.render("[1] 고요한 숲 (25분 집중)", True, (200, 255, 200))
             dun1_desc = small_font.render("기본적인 철광석 위주로 안전하게 파밍합니다.", True, (150, 150, 150))
-            
             dun2_title = font.render("[2] 심연의 동굴 (50분 딥워크)", True, (255, 150, 255))
             dun2_desc = small_font.render("희귀한 미스릴과 아다만티움의 발견 확률이 증가합니다.", True, (200, 150, 200))
-            
             cancel_txt = small_font.render("[Enter] 마을로 돌아가기", True, (150, 150, 150))
-            
             screen.blit(dun1_title, (70, 210))
             screen.blit(dun1_desc, (100, 250))
-            
             screen.blit(dun2_title, (70, 320))
             screen.blit(dun2_desc, (100, 360))
-            
             screen.blit(cancel_txt, (550, 480))
 
         elif current_state == "TIMER":
             dungeon_name = "고요한 숲" if dungeon_type == 1 else "심연의 동굴"
             border_col = (100, 255, 100) if dungeon_type == 1 else (200, 100, 255)
-            
             draw_panel(screen, 40, 120, 720, 390, border_color=border_col)
-            
             minutes = time_left // 60
             seconds = time_left % 60
             time_str = f"{minutes:02d}:{seconds:02d}"
@@ -472,12 +512,10 @@ def main():
             combo_txt = f"(연전 콤보 x{player.combo})" if player.combo > 0 else ""
             title_text = title_font.render(f"[{dungeon_name}] 탐험 중... {combo_txt}", True, (255, 255, 255))
             timer_text = title_font.render(f"⏳ {time_str}", True, (100, 255, 100))
-            
             info_text = small_font.render(f"창고: [{ore_str}]", True, (200, 200, 200))
             temp_text = font.render(f"가방(임시): [{temp_ore_str}]", True, (255, 215, 0))
             warning_text = small_font.render("경고: 창을 벗어나면 가방 안의 광물들이 증발합니다!", True, (255, 100, 100))
             
-            # 💡 [신규] BGM 상태 및 단축키 안내 렌더링
             vol_pct = int(sm.bgm_volume * 100)
             bgm_status_txt = f"BGM: {'ON' if sm.is_bgm_on else 'OFF'} (볼륨: {vol_pct}%)"
             bgm_status = small_font.render(bgm_status_txt, True, (150, 200, 255))
@@ -488,7 +526,6 @@ def main():
             screen.blit(info_text, (80, 300))
             screen.blit(temp_text, (80, 340))
             screen.blit(warning_text, (80, 380))
-            
             screen.blit(bgm_status, (80, 440))
             screen.blit(bgm_hint, (80, 470))
 
@@ -498,14 +535,11 @@ def main():
         elif current_state == "EXPLORATION_DONE":
             draw_panel(screen, 40, 140, 720, 350, border_color=(255, 215, 0))
             done_title = title_font.render("🎉 탐험 완료!", True, (255, 215, 0))
-            
             bonus_rate = int(player.combo * 10)
             bonus_text = font.render(f"현재 획득 예정 자원 (콤보 보너스 +{bonus_rate}%)", True, (200, 255, 200))
             ore_text = font.render(f"[{temp_ore_str}]", True, (255, 255, 255))
-            
             rest_min = 5 if dungeon_type == 1 else 10
             done_desc = font.render(f"▶ 스페이스바를 눌러 여관으로 이동 ({rest_min}분 휴식)", True, (160, 160, 255))
-            
             screen.blit(done_title, (300, 170))
             screen.blit(bonus_text, (80, 240))
             screen.blit(ore_text, (80, 280))
@@ -517,9 +551,7 @@ def main():
             seconds = time_left % 60
             inn_title = title_font.render("☕ 여관에서 휴식 중", True, (255, 255, 255))
             time_render = title_font.render(f"⏳ {minutes:02d}:{seconds:02d}", True, (100, 255, 100))
-            
             hp_text = small_font.render(f"체력 회복 중... {player.current_hp}/{player.max_hp}", True, (255, 150, 150))
-            
             screen.blit(inn_title, (270, 170))
             screen.blit(time_render, (340, 240))
             screen.blit(hp_text, (70, 315))
@@ -531,11 +563,9 @@ def main():
         elif current_state == "INN_CHOICE":
             draw_panel(screen, 40, 170, 720, 280, border_color=(200, 200, 255))
             choice_title = title_font.render("휴식 완료!", True, (200, 200, 200))
-            
             next_bonus = int((player.combo + 1) * 10)
             c1 = font.render(f"[1] 연전 돌입! (다음 던전 자원 보너스 +{next_bonus}%)", True, (255, 215, 0))
             c2 = font.render("[2] 마을로 돌아가기 (콤보 초기화 및 저장)", True, (160, 160, 160))
-            
             screen.blit(choice_title, (320, 200))
             screen.blit(c1, (80, 280))
             screen.blit(c2, (80, 350))
@@ -546,22 +576,16 @@ def main():
             stat_text = font.render(f"현재 스탯 ➡️ HP: {player.max_hp} (Lv.{player.hp_level}) | ATK: {player.atk} (Lv.{player.atk_level})", True, (200, 220, 255))
             screen.blit(title_text, (50, 65))
             screen.blit(stat_text, (50, 120))
-
             draw_panel(screen, 30, 220, 740, 320, border_color=(100, 100, 150))
-            
             hp_req_str = req_to_string(get_upgrade_req(player.hp_level))
             atk_req_str = req_to_string(get_upgrade_req(player.atk_level))
-            
             hp_prob = player.get_success_rate(player.hp_level) * 100
             atk_prob = player.get_success_rate(player.atk_level) * 100
-            
             hp_guide_str = "MAX" if player.hp_level >= 30 else f"비용: [{hp_req_str}] | 확률 {hp_prob:.1f}%"
             atk_guide_str = "MAX" if player.atk_level >= 30 else f"비용: [{atk_req_str}] | 확률 {atk_prob:.1f}%"
-
             guide1 = font.render(f"숫자키 [1]: 체력 +20 강화 ({hp_guide_str})", True, (220, 220, 220))
             guide2 = font.render(f"숫자키 [2]: 공격력 +5 강화 ({atk_guide_str})", True, (220, 220, 220))
             guide_next = font.render("Enter키 누르기: 메뉴로 돌아가기", True, (255, 100, 100))
-
             screen.blit(guide1, (50, 260))
             screen.blit(guide2, (50, 340))
             screen.blit(guide_next, (50, 450))
@@ -591,6 +615,30 @@ def main():
                 color = (255, 215, 0) if i == len(battle_log) - 1 else (180, 180, 180)
                 log_text = font.render(log, True, color)
                 screen.blit(log_text, (60, log_start_y + (i * 35)))
+
+        # 💡 [신규 UX] 떠오르는 데미지 텍스트들을 렌더링하고 지우기
+        for ft in floating_texts[:]:
+            ft.update()
+            ft.draw(screen)
+            if ft.alpha <= 0:
+                floating_texts.remove(ft)
+
+        # 💡 [신규 UX] 부드러운 화면 페이드인/아웃 로직 (가장 마지막에 덮어그리기)
+        if fade_dir == 1:
+            fade_alpha += 25  # 숫자가 클수록 전환이 빠름!
+            if fade_alpha >= 255:
+                fade_alpha = 255
+                current_state = next_state
+                fade_dir = -1
+        elif fade_dir == -1:
+            fade_alpha -= 25
+            if fade_alpha <= 0:
+                fade_alpha = 0
+                fade_dir = 0
+                
+        if fade_alpha > 0:
+            fade_surface.set_alpha(fade_alpha)
+            screen.blit(fade_surface, (0, 0))
 
         pygame.display.flip()
         clock.tick(60)
