@@ -89,11 +89,33 @@ class FloatingText:
         self.y += self.velocity
         self.alpha -= 5  
         
-    def draw(self, screen):
+    def draw(self, surface):
         if self.alpha > 0:
             surf = self.font.render(self.text, True, self.color)
             surf.set_alpha(max(0, self.alpha))
-            screen.blit(surf, (self.x, self.y))
+            surface.blit(surf, (self.x, self.y))
+
+class Particle:
+    def __init__(self, x, y, color):
+        self.x = x
+        self.y = y
+        self.color = color
+        self.vx = random.uniform(-5, 5) 
+        self.vy = random.uniform(-8, -2) 
+        self.life = 255
+        self.size = random.randint(3, 7)
+        
+    def update(self):
+        self.x += self.vx
+        self.y += self.vy
+        self.vy += 0.4  
+        self.life -= 8  
+        
+    def draw(self, surface):
+        if self.life > 0:
+            surf = pygame.Surface((self.size * 2, self.size * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (*self.color, max(0, self.life)), (self.size, self.size), self.size)
+            surface.blit(surf, (self.x - self.size, self.y - self.size))
 
 def save_game(player, stage):
     data = {
@@ -118,15 +140,15 @@ def load_game(player):
             return data.get("stage", 1)
     return 1 
 
-def draw_panel(screen, x, y, w, h, border_color=(100, 100, 100)):
-    pygame.draw.rect(screen, (25, 25, 30), (x, y, w, h), border_radius=8)
-    pygame.draw.rect(screen, border_color, (x, y, w, h), 3, border_radius=8)
+def draw_panel(surface, x, y, w, h, border_color=(100, 100, 100)):
+    pygame.draw.rect(surface, (25, 25, 30), (x, y, w, h), border_radius=8)
+    pygame.draw.rect(surface, border_color, (x, y, w, h), 3, border_radius=8)
 
-def draw_hp_bar(screen, x, y, w, h, current_hp, max_hp):
+def draw_hp_bar(surface, x, y, w, h, current_hp, max_hp):
     ratio = max(current_hp / max_hp, 0)
-    pygame.draw.rect(screen, (80, 20, 20), (x, y, w, h)) 
-    pygame.draw.rect(screen, (40, 180, 40), (x, y, int(w * ratio), h)) 
-    pygame.draw.rect(screen, (200, 200, 200), (x, y, w, h), 2) 
+    pygame.draw.rect(surface, (80, 20, 20), (x, y, w, h)) 
+    pygame.draw.rect(surface, (40, 180, 40), (x, y, int(w * ratio), h)) 
+    pygame.draw.rect(surface, (200, 200, 200), (x, y, w, h), 2) 
 
 def get_upgrade_req(level):
     req = [0, 0, 0] 
@@ -167,6 +189,7 @@ def get_valid_font(size, bold=False):
 def main():
     pygame.init()
     screen = pygame.display.set_mode((800, 600))
+    display_surf = pygame.Surface((800, 600))
     pygame.display.set_caption("던전모도로 - 집중의 시간")
     clock = pygame.time.Clock()
 
@@ -192,6 +215,9 @@ def main():
     battle_status = "ONGOING" 
     
     floating_texts = []
+    particles = [] 
+    shake_time = 0 
+    
     fade_alpha = 0
     fade_dir = 0  
     next_state = ""
@@ -269,6 +295,7 @@ def main():
                 if event.type == pygame.WINDOWFOCUSLOST:
                     if sum(player.temp_ores) > 0:
                         sm.play("error") 
+                        shake_time = 12 # 경고의 의미로 화면 흔들림 유지
                     player.temp_ores = [0, 0, 0] 
                 
                 if event.type == pygame.USEREVENT:
@@ -357,11 +384,15 @@ def main():
                                 player.max_hp += 20
                                 player.hp_level += 1
                                 player.current_hp += 20 
-                                sm.play("upgrade") 
+                                sm.play("upgrade")
+                                for _ in range(40):
+                                    particles.append(Particle(400, 150, random.choice([(255, 215, 0), (200, 255, 200), (255, 255, 255)])))
                             else:
                                 sm.play("hit") 
+                                shake_time = 12 
                         else:
                             sm.play("error") 
+                            shake_time = 8
                     
                     elif event.key == pygame.K_2 and player.atk_level < 30:
                         reqs = get_upgrade_req(player.atk_level)
@@ -373,10 +404,14 @@ def main():
                                 player.atk += 5
                                 player.atk_level += 1
                                 sm.play("upgrade") 
+                                for _ in range(40):
+                                    particles.append(Particle(400, 150, random.choice([(255, 215, 0), (200, 255, 200), (255, 255, 255)])))
                             else:
                                 sm.play("hit") 
+                                shake_time = 12
                         else:
                             sm.play("error") 
+                            shake_time = 8
 
                     elif event.key == pygame.K_RETURN:
                         sm.play("click")
@@ -390,6 +425,8 @@ def main():
                         boss.current_hp -= damage
                         battle_log.append(f"▶ 플레이어의 공격! 보스에게 {damage} 피해.")
                         sm.play("hit") 
+                        
+                        # 💡 [핵심 변경] 플레이어 공격 시 화면 흔들림(shake_time) 완전 제거! 어지럼증 방지!
                         
                         rx = random.randint(550, 630)
                         ry = random.randint(60, 100)
@@ -409,14 +446,16 @@ def main():
                         battle_log.append(f"▷ 보스의 공격! 플레이어에게 {damage} 피해.")
                         sm.play("hit") 
                         
+                        # 💡 [핵심 변경] 맞았을 때만 흔들리도록 하고, 지속 시간을 조금 짧게(8) 조정
+                        shake_time = 8 
+                        
                         rx = random.randint(170, 250)
                         ry = random.randint(60, 100)
                         floating_texts.append(FloatingText(f"-{damage}", rx, ry, (255, 50, 50), title_font))
                         
-                        # 💡 [핵심 변경] 체력이 0 이하가 되었을 때의 처리!
                         if player.current_hp <= 0:
-                            player.current_hp = 0  # 체력이 마이너스가 되지 않게 0으로 고정
-                            battle_log.append("💀 패배... (스페이스바: 마을로 후퇴)") # 문구 변경
+                            player.current_hp = 0  
+                            battle_log.append("💀 패배... (스페이스바: 마을로 후퇴)") 
                             battle_status = "DEFEAT"
                             sm.play("error") 
                             pygame.time.set_timer(BATTLE_EVENT, 0)
@@ -431,12 +470,11 @@ def main():
                         sm.play("click")
                         if battle_status == "VICTORY":
                             stage += 1
-                        # 💡 [핵심 변경] DEFEAT일 때 데이터를 초기화하던 코드(Player(), stage=1)를 완전히 삭제!
                         save_game(player, stage)
                         change_state_with_fade("MENU")
 
-        # --- 🎨 화면 렌더링 ---
-        screen.fill((15, 15, 20)) 
+        # --- 🎨 화면 렌더링 (가상 도화지 display_surf에 그리기) ---
+        display_surf.fill((15, 15, 20)) 
         
         ore_str = f"철 {player.ores[0]} | 미스릴 {player.ores[1]} | 아다만 {player.ores[2]}"
         temp_ore_str = f"철 {player.temp_ores[0]} | 미스릴 {player.temp_ores[1]} | 아다만 {player.temp_ores[2]}"
@@ -444,10 +482,10 @@ def main():
         if current_state == "MENU":
             game_title = title_font.render("던전모도로", True, (220, 220, 220)) 
             sub_title = font.render(f"- 집중의 시간 | 스테이지 {stage} -", True, (150, 150, 150))
-            screen.blit(game_title, (290, 50))
-            screen.blit(sub_title, (240, 110))
+            display_surf.blit(game_title, (290, 50))
+            display_surf.blit(sub_title, (240, 110))
             
-            draw_panel(screen, 80, 170, 640, 390, border_color=(100, 150, 200))
+            draw_panel(display_surf, 80, 170, 640, 390, border_color=(100, 150, 200))
             
             menu1 = font.render("[1] 던전 입장 (탐험 지역 선택)", True, (150, 255, 150))
             menu2 = font.render("[2] 대장간 입장", True, (150, 200, 255))
@@ -456,48 +494,48 @@ def main():
             menu3 = font.render("[3] 보스전 도전", True, (255, 150, 150))
             menu4 = font.render("[4] 데이터 초기화 (새로 시작)", True, (160, 160, 160))
             
-            screen.blit(menu1, (120, 190))
-            screen.blit(menu2, (120, 250))
-            screen.blit(inventory, (160, 290)) 
-            screen.blit(hp_info, (160, 320))
-            screen.blit(menu3, (120, 390))
-            screen.blit(menu4, (120, 460))
+            display_surf.blit(menu1, (120, 190))
+            display_surf.blit(menu2, (120, 250))
+            display_surf.blit(inventory, (160, 290)) 
+            display_surf.blit(hp_info, (160, 320))
+            display_surf.blit(menu3, (120, 390))
+            display_surf.blit(menu4, (120, 460))
 
         elif current_state == "CONFIRM_RESET":
-            draw_panel(screen, 80, 200, 640, 220, border_color=(255, 50, 50))
+            draw_panel(display_surf, 80, 200, 640, 220, border_color=(255, 50, 50))
             warn_title = title_font.render("⚠️ 경고", True, (255, 100, 100))
             warn_text1 = small_font.render("모든 데이터(광물, 스탯, 진행도)가 영구히 삭제됩니다.", True, (200, 200, 200))
             warn_text2 = font.render("정말 처음부터 다시 시작하시겠습니까?", True, (255, 255, 255))
             guide_y = font.render("[Y] 예 (지우기)", True, (255, 100, 100))
             guide_n = font.render("[N] 아니오 (돌아가기)", True, (100, 255, 100))
 
-            screen.blit(warn_title, (330, 215))
-            screen.blit(warn_text1, (140, 275))
-            screen.blit(warn_text2, (170, 315))
-            screen.blit(guide_y, (180, 370))
-            screen.blit(guide_n, (440, 370))
+            display_surf.blit(warn_title, (330, 215))
+            display_surf.blit(warn_text1, (140, 275))
+            display_surf.blit(warn_text2, (170, 315))
+            display_surf.blit(guide_y, (180, 370))
+            display_surf.blit(guide_n, (440, 370))
 
         elif current_state == "SELECT_DUNGEON":
             game_title = title_font.render("목적지 선택", True, (150, 255, 150)) 
             sub_title = font.render("어디로 탐험을 떠나시겠습니까?", True, (150, 150, 150))
-            screen.blit(game_title, (300, 50))
-            screen.blit(sub_title, (250, 120))
-            draw_panel(screen, 40, 180, 720, 350, border_color=(150, 255, 150))
+            display_surf.blit(game_title, (300, 50))
+            display_surf.blit(sub_title, (250, 120))
+            draw_panel(display_surf, 40, 180, 720, 350, border_color=(150, 255, 150))
             dun1_title = font.render("[1] 고요한 숲 (25분 집중)", True, (200, 255, 200))
             dun1_desc = small_font.render("기본적인 철광석 위주로 안전하게 파밍합니다.", True, (150, 150, 150))
             dun2_title = font.render("[2] 심연의 동굴 (50분 딥워크)", True, (255, 150, 255))
             dun2_desc = small_font.render("희귀한 미스릴과 아다만티움의 발견 확률이 증가합니다.", True, (200, 150, 200))
             cancel_txt = small_font.render("[Enter] 마을로 돌아가기", True, (150, 150, 150))
-            screen.blit(dun1_title, (70, 210))
-            screen.blit(dun1_desc, (100, 250))
-            screen.blit(dun2_title, (70, 320))
-            screen.blit(dun2_desc, (100, 360))
-            screen.blit(cancel_txt, (550, 480))
+            display_surf.blit(dun1_title, (70, 210))
+            display_surf.blit(dun1_desc, (100, 250))
+            display_surf.blit(dun2_title, (70, 320))
+            display_surf.blit(dun2_desc, (100, 360))
+            display_surf.blit(cancel_txt, (550, 480))
 
         elif current_state == "TIMER":
             dungeon_name = "고요한 숲" if dungeon_type == 1 else "심연의 동굴"
             border_col = (100, 255, 100) if dungeon_type == 1 else (200, 100, 255)
-            draw_panel(screen, 40, 120, 720, 390, border_color=border_col)
+            draw_panel(display_surf, 40, 120, 720, 390, border_color=border_col)
             minutes = time_left // 60
             seconds = time_left % 60
             time_str = f"{minutes:02d}:{seconds:02d}"
@@ -514,62 +552,62 @@ def main():
             bgm_status = small_font.render(bgm_status_txt, True, (150, 200, 255))
             bgm_hint = small_font.render("단축키 - [M] 재생/정지 | [↑] 소리 크게 | [↓] 소리 작게", True, (150, 150, 150))
 
-            screen.blit(title_text, (70, 150))
-            screen.blit(timer_text, (340, 220))
-            screen.blit(info_text, (80, 300))
-            screen.blit(temp_text, (80, 340))
-            screen.blit(warning_text, (80, 380))
-            screen.blit(bgm_status, (80, 440))
-            screen.blit(bgm_hint, (80, 470))
+            display_surf.blit(title_text, (70, 150))
+            display_surf.blit(timer_text, (340, 220))
+            display_surf.blit(info_text, (80, 300))
+            display_surf.blit(temp_text, (80, 340))
+            display_surf.blit(warning_text, (80, 380))
+            display_surf.blit(bgm_status, (80, 440))
+            display_surf.blit(bgm_hint, (80, 470))
 
             skip_hint = small_font.render("[Space] 스킵 (테스트)", True, (100, 100, 100))
-            screen.blit(skip_hint, (610, 550))
+            display_surf.blit(skip_hint, (610, 550))
 
         elif current_state == "EXPLORATION_DONE":
-            draw_panel(screen, 40, 140, 720, 350, border_color=(255, 215, 0))
+            draw_panel(display_surf, 40, 140, 720, 350, border_color=(255, 215, 0))
             done_title = title_font.render("🎉 탐험 완료!", True, (255, 215, 0))
             bonus_rate = int(player.combo * 10)
             bonus_text = font.render(f"현재 획득 예정 자원 (콤보 보너스 +{bonus_rate}%)", True, (200, 255, 200))
             ore_text = font.render(f"[{temp_ore_str}]", True, (255, 255, 255))
             rest_min = 5 if dungeon_type == 1 else 10
             done_desc = font.render(f"▶ 스페이스바를 눌러 여관으로 이동 ({rest_min}분 휴식)", True, (160, 160, 255))
-            screen.blit(done_title, (300, 170))
-            screen.blit(bonus_text, (80, 240))
-            screen.blit(ore_text, (80, 280))
-            screen.blit(done_desc, (80, 380)) 
+            display_surf.blit(done_title, (300, 170))
+            display_surf.blit(bonus_text, (80, 240))
+            display_surf.blit(ore_text, (80, 280))
+            display_surf.blit(done_desc, (80, 380)) 
 
         elif current_state == "INN_TIMER":
-            draw_panel(screen, 40, 140, 720, 350, border_color=(100, 255, 100))
+            draw_panel(display_surf, 40, 140, 720, 350, border_color=(100, 255, 100))
             minutes = time_left // 60
             seconds = time_left % 60
             inn_title = title_font.render("☕ 여관에서 휴식 중", True, (255, 255, 255))
             time_render = title_font.render(f"⏳ {minutes:02d}:{seconds:02d}", True, (100, 255, 100))
             hp_text = small_font.render(f"체력 회복 중... {player.current_hp}/{player.max_hp}", True, (255, 150, 150))
-            screen.blit(inn_title, (270, 170))
-            screen.blit(time_render, (340, 240))
-            screen.blit(hp_text, (70, 315))
-            draw_hp_bar(screen, 70, 345, 660, 20, player.current_hp, player.max_hp)
+            display_surf.blit(inn_title, (270, 170))
+            display_surf.blit(time_render, (340, 240))
+            display_surf.blit(hp_text, (70, 315))
+            draw_hp_bar(display_surf, 70, 345, 660, 20, player.current_hp, player.max_hp)
 
             skip_hint = small_font.render("[Space] 휴식 스킵", True, (100, 100, 100))
-            screen.blit(skip_hint, (650, 420))
+            display_surf.blit(skip_hint, (650, 420))
 
         elif current_state == "INN_CHOICE":
-            draw_panel(screen, 40, 170, 720, 280, border_color=(200, 200, 255))
+            draw_panel(display_surf, 40, 170, 720, 280, border_color=(200, 200, 255))
             choice_title = title_font.render("휴식 완료!", True, (200, 200, 200))
             next_bonus = int((player.combo + 1) * 10)
             c1 = font.render(f"[1] 연전 돌입! (다음 던전 자원 보너스 +{next_bonus}%)", True, (255, 215, 0))
             c2 = font.render("[2] 마을로 돌아가기 (콤보 초기화 및 저장)", True, (160, 160, 160))
-            screen.blit(choice_title, (320, 200))
-            screen.blit(c1, (80, 280))
-            screen.blit(c2, (80, 350))
+            display_surf.blit(choice_title, (320, 200))
+            display_surf.blit(c1, (80, 280))
+            display_surf.blit(c2, (80, 350))
 
         elif current_state == "UPGRADE":
-            draw_panel(screen, 30, 40, 740, 150, border_color=(150, 200, 255))
+            draw_panel(display_surf, 30, 40, 740, 150, border_color=(150, 200, 255))
             title_text = font.render(f"[ 대장간 ] 광물: {ore_str}", True, (255, 215, 0))
             stat_text = font.render(f"현재 스탯 ➡️ HP: {player.max_hp} (Lv.{player.hp_level}) | ATK: {player.atk} (Lv.{player.atk_level})", True, (200, 220, 255))
-            screen.blit(title_text, (50, 65))
-            screen.blit(stat_text, (50, 120))
-            draw_panel(screen, 30, 220, 740, 320, border_color=(100, 100, 150))
+            display_surf.blit(title_text, (50, 65))
+            display_surf.blit(stat_text, (50, 120))
+            draw_panel(display_surf, 30, 220, 740, 320, border_color=(100, 100, 150))
             hp_req_str = req_to_string(get_upgrade_req(player.hp_level))
             atk_req_str = req_to_string(get_upgrade_req(player.atk_level))
             hp_prob = player.get_success_rate(player.hp_level) * 100
@@ -579,41 +617,47 @@ def main():
             guide1 = font.render(f"숫자키 [1]: 체력 +20 강화 ({hp_guide_str})", True, (220, 220, 220))
             guide2 = font.render(f"숫자키 [2]: 공격력 +5 강화 ({atk_guide_str})", True, (220, 220, 220))
             guide_next = font.render("Enter키 누르기: 메뉴로 돌아가기", True, (255, 100, 100))
-            screen.blit(guide1, (50, 260))
-            screen.blit(guide2, (50, 340))
-            screen.blit(guide_next, (50, 450))
+            display_surf.blit(guide1, (50, 260))
+            display_surf.blit(guide2, (50, 340))
+            display_surf.blit(guide_next, (50, 450))
 
         elif current_state == "BATTLE":
-            draw_panel(screen, 40, 40, 340, 180, border_color=(100, 200, 255))
+            draw_panel(display_surf, 40, 40, 340, 180, border_color=(100, 200, 255))
             p_title = font.render("플레이어", True, (100, 200, 255))
             p_stat = small_font.render(f"공격력: {player.atk}", True, (200, 200, 200))
             p_hp_text = small_font.render(f"HP {player.current_hp}/{player.max_hp}", True, (255, 255, 255))
-            screen.blit(p_title, (60, 55))
-            screen.blit(p_stat, (60, 95))
-            screen.blit(p_hp_text, (60, 130))
-            draw_hp_bar(screen, 60, 160, 300, 20, player.current_hp, player.max_hp)
+            display_surf.blit(p_title, (60, 55))
+            display_surf.blit(p_stat, (60, 95))
+            display_surf.blit(p_hp_text, (60, 130))
+            draw_hp_bar(display_surf, 60, 160, 300, 20, player.current_hp, player.max_hp)
 
-            draw_panel(screen, 420, 40, 340, 180, border_color=(255, 100, 100))
+            draw_panel(display_surf, 420, 40, 340, 180, border_color=(255, 100, 100))
             b_title = font.render(f"보스 (스테이지 {stage})", True, (255, 100, 100))
             b_stat = small_font.render(f"공격력: {boss.atk}", True, (200, 200, 200))
             b_hp_text = small_font.render(f"HP {boss.current_hp}/{boss.max_hp}", True, (255, 255, 255))
-            screen.blit(b_title, (440, 55))
-            screen.blit(b_stat, (440, 95))
-            screen.blit(b_hp_text, (440, 130))
-            draw_hp_bar(screen, 440, 160, 300, 20, boss.current_hp, boss.max_hp)
+            display_surf.blit(b_title, (440, 55))
+            display_surf.blit(b_stat, (440, 95))
+            display_surf.blit(b_hp_text, (440, 130))
+            draw_hp_bar(display_surf, 440, 160, 300, 20, boss.current_hp, boss.max_hp)
 
-            draw_panel(screen, 40, 250, 720, 300, border_color=(150, 150, 150))
+            draw_panel(display_surf, 40, 250, 720, 300, border_color=(150, 150, 150))
             log_start_y = 270
             for i, log in enumerate(battle_log):
                 color = (255, 215, 0) if i == len(battle_log) - 1 else (180, 180, 180)
                 log_text = font.render(log, True, color)
-                screen.blit(log_text, (60, log_start_y + (i * 35)))
+                display_surf.blit(log_text, (60, log_start_y + (i * 35)))
 
         for ft in floating_texts[:]:
             ft.update()
-            ft.draw(screen)
+            ft.draw(display_surf)
             if ft.alpha <= 0:
                 floating_texts.remove(ft)
+
+        for p in particles[:]:
+            p.update()
+            p.draw(display_surf)
+            if p.life <= 0:
+                particles.remove(p)
 
         if fade_dir == 1:
             fade_alpha += 25  
@@ -629,7 +673,17 @@ def main():
                 
         if fade_alpha > 0:
             fade_surface.set_alpha(fade_alpha)
-            screen.blit(fade_surface, (0, 0))
+            display_surf.blit(fade_surface, (0, 0))
+
+        # 💡 [핵심 변경] 진동폭을 (-5, 5)로 줄여서 훨씬 부드러운 흔들림을 구현했어!
+        shake_x, shake_y = 0, 0
+        if shake_time > 0:
+            shake_x = random.randint(-5, 5)
+            shake_y = random.randint(-5, 5)
+            shake_time -= 1
+
+        screen.fill((0, 0, 0)) 
+        screen.blit(display_surf, (shake_x, shake_y))
 
         pygame.display.flip()
         clock.tick(60)
