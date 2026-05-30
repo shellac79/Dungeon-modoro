@@ -69,11 +69,22 @@ class Player:
             return 0.0
         return 1.0 - (level / 29.0) * 0.9
 
+# 💡 [업데이트] 마왕 이후 무한 드래곤 생성 로직 적용!
 class Boss:
     def __init__(self, stage):
+        self.stage = stage
         self.max_hp = 50 + (stage * 50) 
         self.current_hp = self.max_hp
-        self.atk = 5 + (stage * 3)      
+        self.atk = 5 + (stage * 3)
+        
+        boss_names = ["슬라임 킹", "고블린 족장", "해골 기사", "오크 장군", "심연의 마왕"]
+        
+        if stage <= len(boss_names):
+            self.name = boss_names[stage - 1]
+            self.img_name = f"boss{stage}.png"
+        else:
+            self.name = f"드래곤 (Lv.{stage})"
+            self.img_name = "boss6.png" # 무한 반복되는 드래곤은 boss6.png 이미지를 사용!
 
 class FloatingText:
     def __init__(self, text, x, y, color, font):
@@ -186,6 +197,15 @@ def get_valid_font(size, bold=False):
             
     return pygame.font.SysFont(None, size, bold=bold)
 
+def load_image(filename, size):
+    if os.path.exists(filename):
+        try:
+            img = pygame.image.load(filename).convert_alpha()
+            return pygame.transform.scale(img, size)
+        except:
+            pass
+    return None
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode((800, 600))
@@ -224,6 +244,9 @@ def main():
     fade_surface = pygame.Surface((800, 600))
     fade_surface.fill((0, 0, 0))
 
+    player_img = load_image("player.png", (100, 100))
+    boss_img = None
+
     def change_state_with_fade(new_state):
         nonlocal next_state, fade_dir
         next_state = new_state
@@ -250,7 +273,9 @@ def main():
                         change_state_with_fade("UPGRADE")
                     elif event.key == pygame.K_3:
                         boss = Boss(stage)
-                        battle_log = [f"--- 스테이지 {stage} 보스전 시작! ---"]
+                        boss_img = load_image(boss.img_name, (100, 100))
+                        
+                        battle_log = [f"--- {boss.name} 출현! ---"]
                         turn = "PLAYER"
                         battle_status = "ONGOING"
                         pygame.time.set_timer(BATTLE_EVENT, 1000)
@@ -295,7 +320,7 @@ def main():
                 if event.type == pygame.WINDOWFOCUSLOST:
                     if sum(player.temp_ores) > 0:
                         sm.play("error") 
-                        shake_time = 12 # 경고의 의미로 화면 흔들림 유지
+                        shake_time = 12 
                     player.temp_ores = [0, 0, 0] 
                 
                 if event.type == pygame.USEREVENT:
@@ -426,14 +451,12 @@ def main():
                         battle_log.append(f"▶ 플레이어의 공격! 보스에게 {damage} 피해.")
                         sm.play("hit") 
                         
-                        # 💡 [핵심 변경] 플레이어 공격 시 화면 흔들림(shake_time) 완전 제거! 어지럼증 방지!
-                        
-                        rx = random.randint(550, 630)
-                        ry = random.randint(60, 100)
+                        rx = random.randint(450, 530)
+                        ry = random.randint(30, 60)
                         floating_texts.append(FloatingText(f"-{damage}", rx, ry, (255, 50, 50), title_font))
                         
                         if boss.current_hp <= 0:
-                            battle_log.append("🏆 보스 처치! (스페이스바: 마을로 복귀)")
+                            battle_log.append(f"🏆 {boss.name} 처치! (스페이스바: 메뉴로 복귀)")
                             battle_status = "VICTORY"
                             sm.play("upgrade") 
                             pygame.time.set_timer(BATTLE_EVENT, 0) 
@@ -443,14 +466,12 @@ def main():
                     elif turn == "BOSS":
                         damage = boss.atk
                         player.current_hp -= damage
-                        battle_log.append(f"▷ 보스의 공격! 플레이어에게 {damage} 피해.")
+                        battle_log.append(f"▷ {boss.name}의 공격! 플레이어에게 {damage} 피해.")
                         sm.play("hit") 
-                        
-                        # 💡 [핵심 변경] 맞았을 때만 흔들리도록 하고, 지속 시간을 조금 짧게(8) 조정
                         shake_time = 8 
                         
-                        rx = random.randint(170, 250)
-                        ry = random.randint(60, 100)
+                        rx = random.randint(70, 150)
+                        ry = random.randint(30, 60)
                         floating_texts.append(FloatingText(f"-{damage}", rx, ry, (255, 50, 50), title_font))
                         
                         if player.current_hp <= 0:
@@ -484,7 +505,6 @@ def main():
             sub_title = font.render(f"- 집중의 시간 | 스테이지 {stage} -", True, (150, 150, 150))
             display_surf.blit(game_title, (290, 50))
             display_surf.blit(sub_title, (240, 110))
-            
             draw_panel(display_surf, 80, 170, 640, 390, border_color=(100, 150, 200))
             
             menu1 = font.render("[1] 던전 입장 (탐험 지역 선택)", True, (150, 255, 150))
@@ -622,26 +642,38 @@ def main():
             display_surf.blit(guide_next, (50, 450))
 
         elif current_state == "BATTLE":
-            draw_panel(display_surf, 40, 40, 340, 180, border_color=(100, 200, 255))
+            draw_panel(display_surf, 40, 40, 350, 200, border_color=(100, 200, 255))
+            if player_img:
+                display_surf.blit(player_img, (60, 60))
+            else:
+                pygame.draw.rect(display_surf, (100, 200, 255), (60, 60, 100, 100), 2) 
+                
             p_title = font.render("플레이어", True, (100, 200, 255))
             p_stat = small_font.render(f"공격력: {player.atk}", True, (200, 200, 200))
             p_hp_text = small_font.render(f"HP {player.current_hp}/{player.max_hp}", True, (255, 255, 255))
-            display_surf.blit(p_title, (60, 55))
-            display_surf.blit(p_stat, (60, 95))
-            display_surf.blit(p_hp_text, (60, 130))
-            draw_hp_bar(display_surf, 60, 160, 300, 20, player.current_hp, player.max_hp)
+            
+            display_surf.blit(p_title, (180, 60))
+            display_surf.blit(p_stat, (180, 100))
+            display_surf.blit(p_hp_text, (180, 135))
+            draw_hp_bar(display_surf, 60, 180, 310, 20, player.current_hp, player.max_hp)
 
-            draw_panel(display_surf, 420, 40, 340, 180, border_color=(255, 100, 100))
-            b_title = font.render(f"보스 (스테이지 {stage})", True, (255, 100, 100))
+            draw_panel(display_surf, 410, 40, 350, 200, border_color=(255, 100, 100))
+            if boss_img:
+                display_surf.blit(boss_img, (430, 60))
+            else:
+                pygame.draw.rect(display_surf, (255, 100, 100), (430, 60, 100, 100), 2)
+                
+            b_title = font.render(f"{boss.name}", True, (255, 100, 100))
             b_stat = small_font.render(f"공격력: {boss.atk}", True, (200, 200, 200))
             b_hp_text = small_font.render(f"HP {boss.current_hp}/{boss.max_hp}", True, (255, 255, 255))
-            display_surf.blit(b_title, (440, 55))
-            display_surf.blit(b_stat, (440, 95))
-            display_surf.blit(b_hp_text, (440, 130))
-            draw_hp_bar(display_surf, 440, 160, 300, 20, boss.current_hp, boss.max_hp)
+            
+            display_surf.blit(b_title, (550, 60))
+            display_surf.blit(b_stat, (550, 100))
+            display_surf.blit(b_hp_text, (550, 135))
+            draw_hp_bar(display_surf, 430, 180, 310, 20, boss.current_hp, boss.max_hp)
 
-            draw_panel(display_surf, 40, 250, 720, 300, border_color=(150, 150, 150))
-            log_start_y = 270
+            draw_panel(display_surf, 40, 260, 720, 290, border_color=(150, 150, 150))
+            log_start_y = 280
             for i, log in enumerate(battle_log):
                 color = (255, 215, 0) if i == len(battle_log) - 1 else (180, 180, 180)
                 log_text = font.render(log, True, color)
@@ -675,7 +707,6 @@ def main():
             fade_surface.set_alpha(fade_alpha)
             display_surf.blit(fade_surface, (0, 0))
 
-        # 💡 [핵심 변경] 진동폭을 (-5, 5)로 줄여서 훨씬 부드러운 흔들림을 구현했어!
         shake_x, shake_y = 0, 0
         if shake_time > 0:
             shake_x = random.randint(-5, 5)
