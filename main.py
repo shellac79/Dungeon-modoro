@@ -12,6 +12,7 @@ class SoundManager:
         self.load_sound("hit", "hit.wav")           
         self.load_sound("upgrade", "upgrade.wav")   
         self.load_sound("error", "error.wav")       
+        # self.load_sound("alarm", "alarm.wav") # 알람 소리를 추가했다면 주석 해제!
 
     def load_sound(self, name, filename):
         if os.path.exists(filename):
@@ -35,7 +36,7 @@ class Player:
         self.atk_level = 0
         self.ores = [0, 0, 0] 
         self.temp_ores = [0, 0, 0] 
-        self.combo = 0 # 💡 [신규] 연전 콤보 횟수!
+        self.combo = 0 
 
     def get_success_rate(self, level):
         if level >= 30:
@@ -62,7 +63,7 @@ def load_game(player):
         with open("save_data.json", "r") as f:
             data = json.load(f)
             player.max_hp = data.get("max_hp", 100)
-            player.current_hp = data.get("current_hp", player.max_hp) # 💡 체력도 저장/불러오기
+            player.current_hp = data.get("current_hp", player.max_hp) 
             player.atk = data.get("atk", 10)
             player.hp_level = data.get("hp_level", 0)
             player.atk_level = data.get("atk_level", 0)
@@ -146,7 +147,6 @@ def main():
                         current_state = "UPGRADE"
                     elif event.key == pygame.K_3:
                         current_state = "BATTLE"
-                        # 💡 [삭제됨] 보스전에 들어가도 더 이상 체력이 자동 회복되지 않음!
                         boss = Boss(stage)
                         battle_log = [f"--- 스테이지 {stage} 보스전 시작! ---"]
                         turn = "PLAYER"
@@ -182,7 +182,7 @@ def main():
                         dungeon_type = 2
                         current_state = "TIMER"
                     elif event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
-                        player.combo = 0 # 💡 던전 입장을 포기하면 콤보 초기화
+                        player.combo = 0 
                         current_state = "MENU" 
             
             # --- 타이머 (탐험) 화면 ---
@@ -207,35 +207,33 @@ def main():
                                     elif roll <= 80: player.temp_ores[1] += 1 
                                     else: player.temp_ores[2] += 1 
                     else:
-                        # 💡 [수정] 0초가 되면 메뉴로 튕기지 않고 대기 상태로 전환
-                        sm.play("upgrade")
+                        sm.play("upgrade") # 알람 소리를 넣었다면 "alarm"으로 변경
                         current_state = "EXPLORATION_DONE"
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         sm.play("upgrade")
-                        current_state = "EXPLORATION_DONE" # 테스트용 스킵
+                        current_state = "EXPLORATION_DONE" 
 
-            # --- 💡 [신규] 탐험 완료 대기 화면 ---
+            # --- 탐험 완료 대기 화면 ---
             elif current_state == "EXPLORATION_DONE":
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     sm.play("click")
-                    # 💡 콤보 보너스 계산 및 최종 획득
                     bonus_mult = 1.0 + (player.combo * 0.1)
                     for i in range(3):
                         earned = int(player.temp_ores[i] * bonus_mult)
                         player.ores[i] += earned
                     player.temp_ores = [0, 0, 0]
                     
-                    time_left = 300 # 5분 휴식 타이머 세팅
+                    # 💡 던전 타입에 따라 휴식 시간 다르게 설정 (1=5분, 2=10분)
+                    time_left = 300 if dungeon_type == 1 else 600 
                     current_state = "INN_TIMER"
 
-            # --- 💡 [신규] 여관(휴식) 타이머 화면 ---
+            # --- 여관(휴식) 타이머 화면 ---
             elif current_state == "INN_TIMER":
                 if event.type == pygame.USEREVENT:
                     if time_left > 0:
                         time_left -= 1
-                        # 💡 1초마다 체력을 조금씩 회복 (5분 동안 풀피가 되도록 설계)
                         heal_amount = max(1, player.max_hp // 300)
                         if player.current_hp < player.max_hp:
                             player.current_hp = min(player.max_hp, player.current_hp + heal_amount)
@@ -245,19 +243,19 @@ def main():
 
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     sm.play("click")
-                    player.current_hp = player.max_hp # 스킵하면 즉시 풀피
+                    player.current_hp = player.max_hp 
                     current_state = "INN_CHOICE"
 
-            # --- 💡 [신규] 여관 휴식 종료 후 선택 화면 ---
+            # --- 여관 휴식 종료 후 선택 화면 ---
             elif current_state == "INN_CHOICE":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1:
                         sm.play("click")
-                        player.combo += 1 # 콤보 증가!
-                        current_state = "SELECT_DUNGEON" # 바로 다음 던전 선택으로 이동
+                        player.combo += 1 
+                        current_state = "SELECT_DUNGEON" 
                     elif event.key == pygame.K_2:
                         sm.play("click")
-                        player.combo = 0 # 마을로 가면 콤보 끊김
+                        player.combo = 0 
                         save_game(player, stage)
                         current_state = "MENU"
 
@@ -273,7 +271,6 @@ def main():
                             if random.random() < player.get_success_rate(player.hp_level):
                                 player.max_hp += 20
                                 player.hp_level += 1
-                                # 업글 시 현재 체력도 비율에 맞게 올려주기
                                 player.current_hp += 20 
                                 sm.play("upgrade") 
                             else:
@@ -361,10 +358,7 @@ def main():
             menu1 = font.render("[1] 던전 입장 (탐험 지역 선택)", True, (150, 255, 150))
             menu2 = font.render("[2] 대장간 입장", True, (150, 200, 255))
             inventory = small_font.render(f"보유 광물: [{ore_str}]", True, (255, 215, 0))
-            
-            # 💡 [신규] 체력은 휴식으로만 찹니다!
             hp_info = small_font.render(f"현재 체력: {player.current_hp}/{player.max_hp} (휴식으로만 회복!)", True, (255, 100, 100))
-            
             menu3 = font.render("[3] 보스전 도전", True, (255, 150, 150))
             menu4 = font.render("[4] 데이터 초기화 (새로 시작)", True, (150, 150, 150))
             
@@ -377,11 +371,9 @@ def main():
 
         elif current_state == "CONFIRM_RESET":
             draw_panel(screen, 150, 200, 500, 220, border_color=(255, 50, 50))
-            
             warn_title = title_font.render("⚠️ 경고", True, (255, 100, 100))
             warn_text1 = small_font.render("모든 데이터(광물, 스탯, 진행도)가 영구히 삭제됩니다.", True, (200, 200, 200))
             warn_text2 = font.render("정말 처음부터 다시 시작하시겠습니까?", True, (255, 255, 255))
-            
             guide_y = font.render("[Y] 예 (지우기)", True, (255, 100, 100))
             guide_n = font.render("[N] 아니오 (돌아가기)", True, (100, 255, 100))
 
@@ -409,7 +401,6 @@ def main():
             
             screen.blit(dun1_title, (140, 230))
             screen.blit(dun1_desc, (170, 270))
-            
             screen.blit(dun2_title, (140, 340))
             screen.blit(dun2_desc, (170, 380))
             screen.blit(cancel_txt, (500, 470))
@@ -424,7 +415,6 @@ def main():
             seconds = time_left % 60
             time_str = f"{minutes:02d}:{seconds:02d}"
 
-            # 💡 연전 시 콤보 문구 출력
             combo_txt = f"(연전 콤보 x{player.combo})" if player.combo > 0 else ""
             title_text = title_font.render(f"[{dungeon_name}] 탐험 중... {combo_txt}", True, (255, 255, 255))
             timer_text = title_font.render(f"⏳ {time_str}", True, (100, 255, 100))
@@ -442,7 +432,6 @@ def main():
             skip_hint = small_font.render("[Space] 0초 스킵 (테스트용)", True, (100, 100, 100))
             screen.blit(skip_hint, (550, 560))
 
-        # 💡 [신규 UI] 탐험 완료 대기 
         elif current_state == "EXPLORATION_DONE":
             draw_panel(screen, 150, 150, 500, 300, border_color=(255, 215, 0))
             done_title = title_font.render("🎉 탐험 완료!", True, (255, 215, 0))
@@ -451,14 +440,15 @@ def main():
             bonus_text = font.render(f"현재 획득 예정 자원 (콤보 보너스 +{bonus_rate}%)", True, (200, 255, 200))
             ore_text = font.render(f"[{temp_ore_str}]", True, (255, 255, 255))
             
-            done_desc = small_font.render("▶ 스페이스바를 눌러 여관으로 이동 (5분 휴식)", True, (150, 150, 150))
+            # 💡 던전 타입에 맞춰 5분/10분 글씨 변경
+            rest_min = 5 if dungeon_type == 1 else 10
+            done_desc = small_font.render(f"▶ 스페이스바를 눌러 여관으로 이동 ({rest_min}분 휴식)", True, (150, 150, 150))
             
             screen.blit(done_title, (280, 180))
             screen.blit(bonus_text, (190, 250))
             screen.blit(ore_text, (190, 290))
-            screen.blit(done_desc, (190, 380))
+            screen.blit(done_desc, (170, 380)) 
 
-        # 💡 [신규 UI] 여관 휴식 중 (체력 회복 묘사)
         elif current_state == "INN_TIMER":
             draw_panel(screen, 150, 150, 500, 300, border_color=(100, 255, 100))
             minutes = time_left // 60
@@ -476,7 +466,6 @@ def main():
             skip_hint = small_font.render("[Space] 휴식 0초 스킵", True, (100, 100, 100))
             screen.blit(skip_hint, (530, 420))
 
-        # 💡 [신규 UI] 휴식 종료 후 선택
         elif current_state == "INN_CHOICE":
             draw_panel(screen, 100, 180, 600, 260, border_color=(200, 200, 255))
             choice_title = title_font.render("휴식 완료!", True, (200, 200, 255))
