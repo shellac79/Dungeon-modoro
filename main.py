@@ -75,7 +75,6 @@ class Boss:
         self.current_hp = self.max_hp
         self.atk = 5 + (stage * 3)      
 
-# 💡 [신규 UX] 허공으로 떠오르며 사라지는 데미지 텍스트 클래스
 class FloatingText:
     def __init__(self, text, x, y, color, font):
         self.text = text
@@ -84,11 +83,11 @@ class FloatingText:
         self.color = color
         self.font = font
         self.alpha = 255
-        self.velocity = -2  # 위로 올라가는 속도
+        self.velocity = -2  
         
     def update(self):
         self.y += self.velocity
-        self.alpha -= 5  # 서서히 투명해짐
+        self.alpha -= 5  
         
     def draw(self, screen):
         if self.alpha > 0:
@@ -192,15 +191,13 @@ def main():
     turn = "PLAYER"
     battle_status = "ONGOING" 
     
-    # 💡 [신규 UX] 파티클 및 화면 페이드(화면 전환) 관리 변수
     floating_texts = []
     fade_alpha = 0
-    fade_dir = 0  # 1: 어두워짐(Fade-out), -1: 밝아짐(Fade-in), 0: 안함
+    fade_dir = 0  
     next_state = ""
     fade_surface = pygame.Surface((800, 600))
     fade_surface.fill((0, 0, 0))
 
-    # 💡 [신규 UX] 즉시 화면이 안 넘어가고 페이드 아웃을 거치도록 돕는 헬퍼 함수
     def change_state_with_fade(new_state):
         nonlocal next_state, fade_dir
         next_state = new_state
@@ -213,7 +210,6 @@ def main():
                 pygame.quit()
                 sys.exit()
 
-            # 🚨 화면이 어두워지고 밝아지는 페이드 효과 중에는 키보드 입력을 무시함! (오류 방지)
             if event.type == pygame.KEYDOWN and fade_dir != 0:
                 continue
 
@@ -325,7 +321,6 @@ def main():
                         heal_amount = max(1, player.max_hp // 300)
                         if player.current_hp < player.max_hp:
                             player.current_hp = min(player.max_hp, player.current_hp + heal_amount)
-                            # 💡 [신규 UX] 여관에서 체력이 차오를 때 초록색 + 힐링 텍스트 파티클 생성!
                             rx = random.randint(350, 450)
                             ry = random.randint(280, 310)
                             floating_texts.append(FloatingText(f"+{heal_amount}", rx, ry, (50, 255, 50), title_font))
@@ -396,13 +391,12 @@ def main():
                         battle_log.append(f"▶ 플레이어의 공격! 보스에게 {damage} 피해.")
                         sm.play("hit") 
                         
-                        # 💡 [신규 UX] 보스(오른쪽 패널) 머리 위에 데미지 텍스트 띄우기
                         rx = random.randint(550, 630)
                         ry = random.randint(60, 100)
                         floating_texts.append(FloatingText(f"-{damage}", rx, ry, (255, 50, 50), title_font))
                         
                         if boss.current_hp <= 0:
-                            battle_log.append("🏆 보스 처치! (스페이스바: 메뉴로 복귀)")
+                            battle_log.append("🏆 보스 처치! (스페이스바: 마을로 복귀)")
                             battle_status = "VICTORY"
                             sm.play("upgrade") 
                             pygame.time.set_timer(BATTLE_EVENT, 0) 
@@ -415,13 +409,14 @@ def main():
                         battle_log.append(f"▷ 보스의 공격! 플레이어에게 {damage} 피해.")
                         sm.play("hit") 
                         
-                        # 💡 [신규 UX] 플레이어(왼쪽 패널) 머리 위에 데미지 텍스트 띄우기
                         rx = random.randint(170, 250)
                         ry = random.randint(60, 100)
                         floating_texts.append(FloatingText(f"-{damage}", rx, ry, (255, 50, 50), title_font))
                         
+                        # 💡 [핵심 변경] 체력이 0 이하가 되었을 때의 처리!
                         if player.current_hp <= 0:
-                            battle_log.append("💀 사망... (스페이스바: 스탯 리셋 후 메뉴 복귀)")
+                            player.current_hp = 0  # 체력이 마이너스가 되지 않게 0으로 고정
+                            battle_log.append("💀 패배... (스페이스바: 마을로 후퇴)") # 문구 변경
                             battle_status = "DEFEAT"
                             sm.play("error") 
                             pygame.time.set_timer(BATTLE_EVENT, 0)
@@ -436,9 +431,7 @@ def main():
                         sm.play("click")
                         if battle_status == "VICTORY":
                             stage += 1
-                        elif battle_status == "DEFEAT":
-                            player = Player() 
-                            stage = 1
+                        # 💡 [핵심 변경] DEFEAT일 때 데이터를 초기화하던 코드(Player(), stage=1)를 완전히 삭제!
                         save_game(player, stage)
                         change_state_with_fade("MENU")
 
@@ -616,16 +609,14 @@ def main():
                 log_text = font.render(log, True, color)
                 screen.blit(log_text, (60, log_start_y + (i * 35)))
 
-        # 💡 [신규 UX] 떠오르는 데미지 텍스트들을 렌더링하고 지우기
         for ft in floating_texts[:]:
             ft.update()
             ft.draw(screen)
             if ft.alpha <= 0:
                 floating_texts.remove(ft)
 
-        # 💡 [신규 UX] 부드러운 화면 페이드인/아웃 로직 (가장 마지막에 덮어그리기)
         if fade_dir == 1:
-            fade_alpha += 25  # 숫자가 클수록 전환이 빠름!
+            fade_alpha += 25  
             if fade_alpha >= 255:
                 fade_alpha = 255
                 current_state = next_state
