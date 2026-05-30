@@ -12,6 +12,10 @@ class SoundManager:
         self.load_sound("hit", "hit.wav")           
         self.load_sound("upgrade", "upgrade.wav")   
         self.load_sound("error", "error.wav")       
+        
+        # 💡 [신규] BGM 상태 관리를 위한 변수들
+        self.bgm_volume = 0.5  # 기본 볼륨 50%
+        self.is_bgm_on = True  # BGM 켜짐/꺼짐 상태
 
     def load_sound(self, name, filename):
         if os.path.exists(filename):
@@ -25,6 +29,32 @@ class SoundManager:
                 self.sounds[name].play(maxtime=play_time)
             else:
                 self.sounds[name].play()
+
+    # 💡 [업데이트] BGM 재생, 정지, 볼륨 조절, 토글 기능 추가
+    def play_bgm(self, filename):
+        if os.path.exists(filename) and self.is_bgm_on:
+            try:
+                pygame.mixer.music.load(filename)
+                pygame.mixer.music.set_volume(self.bgm_volume)
+                pygame.mixer.music.play(-1)
+            except:
+                pass
+            
+    def stop_bgm(self):
+        pygame.mixer.music.stop()
+
+    def toggle_bgm(self, current_bgm_file):
+        self.is_bgm_on = not self.is_bgm_on
+        if self.is_bgm_on and current_bgm_file:
+            self.play_bgm(current_bgm_file)
+        else:
+            self.stop_bgm()
+
+    def change_volume(self, delta):
+        self.bgm_volume += delta
+        # 볼륨은 0.0(0%) ~ 1.0(100%) 사이를 벗어나지 않게 고정
+        self.bgm_volume = max(0.0, min(1.0, self.bgm_volume)) 
+        pygame.mixer.music.set_volume(self.bgm_volume)
 
 class Player:
     def __init__(self):
@@ -102,7 +132,6 @@ def req_to_string(req_list):
     return ", ".join(res)
 
 def get_valid_font(size, bold=False):
-    """💡 폰트 파일이 없어도 기본 폰트에서 최대한 깔끔하게 나오도록 보장"""
     font_path = "font.ttf"
     if os.path.exists(font_path):
         try:
@@ -128,7 +157,6 @@ def main():
     player = Player()
     stage = load_game(player)
     
-    # 💡 폰트 크기 시원하게 원상복구 및 확대!
     font = get_valid_font(24)
     small_font = get_valid_font(20)
     title_font = get_valid_font(40, bold=True)
@@ -136,6 +164,7 @@ def main():
     current_state = "MENU"
     time_left = 0 
     dungeon_type = 1 
+    current_bgm_file = "" # 💡 [신규] 현재 재생 중인 음악을 기억하는 변수
     
     pygame.time.set_timer(pygame.USEREVENT, 1000)
     BATTLE_EVENT = pygame.USEREVENT + 1
@@ -152,7 +181,6 @@ def main():
                 pygame.quit()
                 sys.exit()
 
-            # --- 메뉴 화면 ---
             if current_state == "MENU":
                 if event.type == pygame.KEYDOWN:
                     if event.key in [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4]:
@@ -184,7 +212,6 @@ def main():
                         sm.play("click")
                         current_state = "MENU"
 
-            # --- 던전 선택 화면 ---
             elif current_state == "SELECT_DUNGEON":
                 if event.type == pygame.KEYDOWN:
                     if event.key in [pygame.K_1, pygame.K_2, pygame.K_ESCAPE, pygame.K_RETURN]:
@@ -193,16 +220,19 @@ def main():
                     if event.key == pygame.K_1:
                         time_left = 1500 
                         dungeon_type = 1
+                        current_bgm_file = "bgm_forest.mp3"
+                        sm.play_bgm(current_bgm_file) 
                         current_state = "TIMER"
                     elif event.key == pygame.K_2:
                         time_left = 3000 
                         dungeon_type = 2
+                        current_bgm_file = "bgm_cave.mp3"
+                        sm.play_bgm(current_bgm_file)
                         current_state = "TIMER"
                     elif event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
                         player.combo = 0 
                         current_state = "MENU" 
             
-            # --- 타이머 (탐험) 화면 ---
             elif current_state == "TIMER":
                 if event.type == pygame.WINDOWFOCUSLOST:
                     if sum(player.temp_ores) > 0:
@@ -224,15 +254,23 @@ def main():
                                     elif roll <= 80: player.temp_ores[1] += 1 
                                     else: player.temp_ores[2] += 1 
                     else:
+                        sm.stop_bgm() 
                         sm.play("upgrade") 
                         current_state = "EXPLORATION_DONE"
 
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
+                    # 💡 [신규] BGM 컨트롤 단축키 (M: 켜기/끄기, 위/아래: 볼륨)
+                    if event.key == pygame.K_m:
+                        sm.toggle_bgm(current_bgm_file)
+                    elif event.key == pygame.K_UP:
+                        sm.change_volume(0.1) # 10% 증가
+                    elif event.key == pygame.K_DOWN:
+                        sm.change_volume(-0.1) # 10% 감소
+                    elif event.key == pygame.K_SPACE:
+                        sm.stop_bgm()
                         sm.play("upgrade")
                         current_state = "EXPLORATION_DONE" 
 
-            # --- 탐험 완료 대기 화면 ---
             elif current_state == "EXPLORATION_DONE":
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     sm.play("click")
@@ -245,7 +283,6 @@ def main():
                     time_left = 300 if dungeon_type == 1 else 600 
                     current_state = "INN_TIMER"
 
-            # --- 여관(휴식) 타이머 화면 ---
             elif current_state == "INN_TIMER":
                 if event.type == pygame.USEREVENT:
                     if time_left > 0:
@@ -262,7 +299,6 @@ def main():
                     player.current_hp = player.max_hp 
                     current_state = "INN_CHOICE"
 
-            # --- 여관 휴식 종료 후 선택 화면 ---
             elif current_state == "INN_CHOICE":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1:
@@ -275,7 +311,6 @@ def main():
                         save_game(player, stage)
                         current_state = "MENU"
 
-            # --- 대장간 화면 ---
             elif current_state == "UPGRADE":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1 and player.hp_level < 30:
@@ -314,7 +349,6 @@ def main():
                         current_state = "MENU"
                         save_game(player, stage)
 
-            # --- 보스전 화면 ---
             elif current_state == "BATTLE":
                 if event.type == BATTLE_EVENT and battle_status == "ONGOING":
                     if turn == "PLAYER":
@@ -404,12 +438,11 @@ def main():
         elif current_state == "SELECT_DUNGEON":
             game_title = title_font.render("목적지 선택", True, (150, 255, 150)) 
             sub_title = font.render("어디로 탐험을 떠나시겠습니까?", True, (150, 150, 150))
-            screen.blit(game_title, (290, 50))
-            screen.blit(sub_title, (240, 120))
+            screen.blit(game_title, (300, 50))
+            screen.blit(sub_title, (250, 120))
             
             draw_panel(screen, 40, 180, 720, 350, border_color=(150, 255, 150))
             
-            # 💡 '얕은 숲'을 '고요한 숲'으로 변경해서 버그 원천 차단!
             dun1_title = font.render("[1] 고요한 숲 (25분 집중)", True, (200, 255, 200))
             dun1_desc = small_font.render("기본적인 철광석 위주로 안전하게 파밍합니다.", True, (150, 150, 150))
             
@@ -427,7 +460,6 @@ def main():
             screen.blit(cancel_txt, (550, 480))
 
         elif current_state == "TIMER":
-            # 💡 이름 동기화 변경
             dungeon_name = "고요한 숲" if dungeon_type == 1 else "심연의 동굴"
             border_col = (100, 255, 100) if dungeon_type == 1 else (200, 100, 255)
             
@@ -445,11 +477,20 @@ def main():
             temp_text = font.render(f"가방(임시): [{temp_ore_str}]", True, (255, 215, 0))
             warning_text = small_font.render("경고: 창을 벗어나면 가방 안의 광물들이 증발합니다!", True, (255, 100, 100))
             
+            # 💡 [신규] BGM 상태 및 단축키 안내 렌더링
+            vol_pct = int(sm.bgm_volume * 100)
+            bgm_status_txt = f"BGM: {'ON' if sm.is_bgm_on else 'OFF'} (볼륨: {vol_pct}%)"
+            bgm_status = small_font.render(bgm_status_txt, True, (150, 200, 255))
+            bgm_hint = small_font.render("단축키 - [M] 재생/정지 | [↑] 소리 크게 | [↓] 소리 작게", True, (150, 150, 150))
+
             screen.blit(title_text, (70, 150))
             screen.blit(timer_text, (340, 220))
             screen.blit(info_text, (80, 300))
             screen.blit(temp_text, (80, 340))
-            screen.blit(warning_text, (80, 420))
+            screen.blit(warning_text, (80, 380))
+            
+            screen.blit(bgm_status, (80, 440))
+            screen.blit(bgm_hint, (80, 470))
 
             skip_hint = small_font.render("[Space] 스킵 (테스트)", True, (100, 100, 100))
             screen.blit(skip_hint, (610, 550))
