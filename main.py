@@ -251,17 +251,17 @@ def main():
         next_state = new_state
         fade_dir = 1 
 
-    # 💡 광물 굴리기 헬퍼 함수
     def roll_mineral():
-        roll = random.randint(1, 100)
-        if dungeon_type == 1: # 고요한 숲
-            if roll <= 60: player.temp_ores[0] += 1 
-            elif roll <= 90: player.temp_ores[1] += 1 
-            else: player.temp_ores[2] += 1 
-        elif dungeon_type == 2: # 심연의 동굴
-            if roll <= 45: player.temp_ores[0] += 1 
-            elif roll <= 80: player.temp_ores[1] += 1 
-            else: player.temp_ores[2] += 1 
+        if random.random() < 0.30:  # 30% 고정 확률
+            roll = random.randint(1, 100)
+            if dungeon_type == 1:
+                if roll <= 60: player.temp_ores[0] += 1 
+                elif roll <= 90: player.temp_ores[1] += 1 
+                else: player.temp_ores[2] += 1 
+            elif dungeon_type == 2:
+                if roll <= 45: player.temp_ores[0] += 1 
+                elif roll <= 80: player.temp_ores[1] += 1 
+                else: player.temp_ores[2] += 1 
 
     while True:
         for event in pygame.event.get():
@@ -336,7 +336,6 @@ def main():
                 if event.type == pygame.USEREVENT:
                     if time_left > 0:
                         time_left -= 1
-                        # 💡 10초당 1개 획득 로직
                         if time_left > 0 and time_left % 10 == 0:
                             roll_mineral()
                     else:
@@ -352,7 +351,6 @@ def main():
                     elif event.key == pygame.K_DOWN:
                         sm.change_volume(-0.1) 
                     elif event.key == pygame.K_SPACE:
-                        # 💡 [핵심] 스킵 시 남은 시간만큼의 보상 지급
                         remaining_intervals = time_left // 10
                         for _ in range(remaining_intervals):
                             roll_mineral()
@@ -388,7 +386,7 @@ def main():
 
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     sm.play("click")
-                    player.current_hp = player.max_hp # 여관 스킵: 체력 즉각 풀회복
+                    player.current_hp = player.max_hp 
                     change_state_with_fade("INN_CHOICE")
 
             elif current_state == "INN_CHOICE":
@@ -516,6 +514,7 @@ def main():
             display_surf.blit(hp_info, (160, 320))
             display_surf.blit(menu3, (120, 390))
             display_surf.blit(menu4, (120, 460))
+
         elif current_state == "CONFIRM_RESET":
             draw_panel(display_surf, 80, 200, 640, 220, border_color=(255, 50, 50))
             warn_title = title_font.render("⚠️ 경고", True, (255, 100, 100))
@@ -528,48 +527,62 @@ def main():
             display_surf.blit(warn_text2, (170, 315))
             display_surf.blit(guide_y, (180, 370))
             display_surf.blit(guide_n, (440, 370))
+
         elif current_state == "SELECT_DUNGEON":
             game_title = title_font.render("목적지 선택", True, (150, 255, 150)) 
             sub_title = font.render("어디로 탐험을 떠나시겠습니까?", True, (150, 150, 150))
             display_surf.blit(game_title, (300, 50))
             display_surf.blit(sub_title, (250, 120))
             draw_panel(display_surf, 40, 180, 720, 350, border_color=(150, 255, 150))
+            
             dun1_title = font.render("[1] 고요한 숲 (25분 집중)", True, (200, 255, 200))
-            dun1_desc = small_font.render("기본적인 철광석 위주로 안전하게 파밍합니다.", True, (150, 150, 150))
+            # 💡 [업데이트] 던전 선택 화면에 확률 안내문 이사옴!
+            dun1_prob = small_font.render("└ 10초당 30% 확률 획득 (철 60% | 미스릴 30% | 아다만 10%)", True, (150, 200, 150))
+            
             dun2_title = font.render("[2] 심연의 동굴 (50분 딥워크)", True, (255, 150, 255))
-            dun2_desc = small_font.render("희귀한 미스릴과 아다만티움의 발견 확률이 증가합니다.", True, (200, 150, 200))
+            # 💡 [업데이트] 던전 2 확률 정보 추가
+            dun2_prob = small_font.render("└ 10초당 30% 확률 획득 (철 45% | 미스릴 35% | 아다만 20%)", True, (200, 150, 200))
+            
             cancel_txt = small_font.render("[Enter] 마을로 돌아가기", True, (150, 150, 150))
+            
             display_surf.blit(dun1_title, (70, 210))
-            display_surf.blit(dun1_desc, (100, 250))
-            display_surf.blit(dun2_title, (70, 320))
-            display_surf.blit(dun2_desc, (100, 360))
+            display_surf.blit(dun1_prob, (100, 250))
+            display_surf.blit(dun2_title, (70, 340))
+            display_surf.blit(dun2_prob, (100, 380))
             display_surf.blit(cancel_txt, (550, 480))
+
         elif current_state == "TIMER":
             dungeon_name = "고요한 숲" if dungeon_type == 1 else "심연의 동굴"
             border_col = (100, 255, 100) if dungeon_type == 1 else (200, 100, 255)
             draw_panel(display_surf, 40, 120, 720, 390, border_color=border_col)
+            
             minutes = time_left // 60
             seconds = time_left % 60
             time_str = f"{minutes:02d}:{seconds:02d}"
             combo_txt = f"(연전 콤보 x{player.combo})" if player.combo > 0 else ""
+            
             title_text = title_font.render(f"[{dungeon_name}] 탐험 중... {combo_txt}", True, (255, 255, 255))
             timer_text = title_font.render(f"⏳ {time_str}", True, (100, 255, 100))
-            info_text = small_font.render(f"창고: [{ore_str}]", True, (200, 200, 200))
+            
+            # 💡 [업데이트] 창고 지우고, 가방만 남겨서 시선 정리!
             temp_text = font.render(f"가방(임시): [{temp_ore_str}]", True, (255, 215, 0))
-            warning_text = small_font.render("경고: 창을 벗어나면 가방 안의 광물들이 증발합니다!", True, (255, 100, 100))
+            
+            # 💡 [업데이트] 3줄이던 경고 및 안내문을 짧고 간결하게 통폐합!
+            warning_text = small_font.render("⚠️ 주의: 창을 벗어나면 캔 광물이 모두 증발합니다!", True, (255, 100, 100))
+            
             vol_pct = int(sm.bgm_volume * 100)
-            bgm_status_txt = f"BGM: {'ON' if sm.is_bgm_on else 'OFF'} (볼륨: {vol_pct}%)"
-            bgm_status = small_font.render(bgm_status_txt, True, (150, 200, 255))
-            bgm_hint = small_font.render("단축키 - [M] 재생/정지 | [↑] 소리 크게 | [↓] 소리 작게", True, (150, 150, 150))
+            bgm_status = small_font.render(f"🎵 BGM 단축키: [M] ON/OFF  |  🔊 볼륨 [↑/↓] ({vol_pct}%)", True, (150, 200, 255))
+            
+            # 화면 중앙부터 여백을 넓혀서 쾌적하게 배치
             display_surf.blit(title_text, (70, 150))
             display_surf.blit(timer_text, (340, 220))
-            display_surf.blit(info_text, (80, 300))
-            display_surf.blit(temp_text, (80, 340))
+            display_surf.blit(temp_text, (80, 300))
             display_surf.blit(warning_text, (80, 380))
-            display_surf.blit(bgm_status, (80, 440))
-            display_surf.blit(bgm_hint, (80, 470))
-            skip_hint = small_font.render("[Space] 스킵 (남은 시간 보상 모두 획득)", True, (100, 100, 100))
+            display_surf.blit(bgm_status, (80, 430))
+            
+            skip_hint = small_font.render("[Space] 스킵 (잔여 시간 보상 정산)", True, (100, 100, 100))
             display_surf.blit(skip_hint, (510, 550))
+
         elif current_state == "EXPLORATION_DONE":
             draw_panel(display_surf, 40, 140, 720, 350, border_color=(255, 215, 0))
             done_title = title_font.render("🎉 탐험 완료!", True, (255, 215, 0))
@@ -582,6 +595,7 @@ def main():
             display_surf.blit(bonus_text, (80, 240))
             display_surf.blit(ore_text, (80, 280))
             display_surf.blit(done_desc, (80, 380)) 
+
         elif current_state == "INN_TIMER":
             draw_panel(display_surf, 40, 140, 720, 350, border_color=(100, 255, 100))
             minutes = time_left // 60
@@ -595,6 +609,7 @@ def main():
             draw_hp_bar(display_surf, 70, 345, 660, 20, player.current_hp, player.max_hp)
             skip_hint = small_font.render("[Space] 휴식 스킵 (즉시 완회)", True, (100, 100, 100))
             display_surf.blit(skip_hint, (610, 420))
+
         elif current_state == "INN_CHOICE":
             draw_panel(display_surf, 40, 170, 720, 280, border_color=(200, 200, 255))
             choice_title = title_font.render("휴식 완료!", True, (200, 200, 200))
@@ -604,6 +619,7 @@ def main():
             display_surf.blit(choice_title, (320, 200))
             display_surf.blit(c1, (80, 280))
             display_surf.blit(c2, (80, 350))
+
         elif current_state == "UPGRADE":
             draw_panel(display_surf, 30, 40, 740, 150, border_color=(150, 200, 255))
             title_text = font.render(f"[ 대장간 ] 광물: {ore_str}", True, (255, 215, 0))
@@ -623,6 +639,7 @@ def main():
             display_surf.blit(guide1, (50, 260))
             display_surf.blit(guide2, (50, 340))
             display_surf.blit(guide_next, (50, 450))
+
         elif current_state == "BATTLE":
             draw_panel(display_surf, 40, 40, 350, 200, border_color=(100, 200, 255))
             if player_img: display_surf.blit(player_img, (60, 60))
@@ -634,6 +651,7 @@ def main():
             display_surf.blit(p_stat, (180, 100))
             display_surf.blit(p_hp_text, (180, 135))
             draw_hp_bar(display_surf, 60, 180, 310, 20, player.current_hp, player.max_hp)
+            
             draw_panel(display_surf, 410, 40, 350, 200, border_color=(255, 100, 100))
             if boss_img: display_surf.blit(boss_img, (430, 60))
             else: pygame.draw.rect(display_surf, (255, 100, 100), (430, 60, 100, 100), 2)
@@ -644,6 +662,7 @@ def main():
             display_surf.blit(b_stat, (550, 100))
             display_surf.blit(b_hp_text, (550, 135))
             draw_hp_bar(display_surf, 430, 180, 310, 20, boss.current_hp, boss.max_hp)
+            
             draw_panel(display_surf, 40, 260, 720, 290, border_color=(150, 150, 150))
             log_start_y = 280
             for i, log in enumerate(battle_log):
