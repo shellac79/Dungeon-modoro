@@ -69,7 +69,7 @@ class Player:
             return 0.0
         return 1.0 - (level / 29.0) * 0.9
 
-# 💡 [업데이트] 마왕 이후 무한 드래곤 생성 로직 적용!
+# 💡 [업데이트] 6스테이지부터는 5번 보스(지옥의 악마)가 재등장!
 class Boss:
     def __init__(self, stage):
         self.stage = stage
@@ -77,14 +77,15 @@ class Boss:
         self.current_hp = self.max_hp
         self.atk = 5 + (stage * 3)
         
-        boss_names = ["슬라임 킹", "고블린 족장", "해골 기사", "오크 장군", "심연의 마왕"]
+        boss_names = ["거대 맹독 슬라임", "단검 고블린 정찰병", "심연의 주시자", "잔혹한 흡혈귀 뱀파이어", "지옥의 악마"]
         
         if stage <= len(boss_names):
             self.name = boss_names[stage - 1]
             self.img_name = f"boss{stage}.png"
         else:
-            self.name = f"드래곤 (Lv.{stage})"
-            self.img_name = "boss6.png" # 무한 반복되는 드래곤은 boss6.png 이미지를 사용!
+            # 6스테이지 이상은 5스테이지 이미지와 이름을 활용하여 무한 생성
+            self.name = f"지옥의 악마 (Lv.{stage})"
+            self.img_name = "boss5.png"
 
 class FloatingText:
     def __init__(self, text, x, y, color, font):
@@ -494,7 +495,7 @@ def main():
                         save_game(player, stage)
                         change_state_with_fade("MENU")
 
-        # --- 🎨 화면 렌더링 (가상 도화지 display_surf에 그리기) ---
+        # --- 🎨 화면 렌더링 ---
         display_surf.fill((15, 15, 20)) 
         
         ore_str = f"철 {player.ores[0]} | 미스릴 {player.ores[1]} | 아다만 {player.ores[2]}"
