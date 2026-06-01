@@ -173,11 +173,11 @@ def draw_panel(surface, x, y, w, h, border_color=(100, 100, 100)):
     pygame.draw.rect(surface, (25, 25, 30), (x, y, w, h), border_radius=8)
     pygame.draw.rect(surface, border_color, (x, y, w, h), 3, border_radius=8)
 
-def draw_transparent_panel(surface, x, y, w, h, border_color=(100, 100, 100), alpha=160, border_width=3):
+def draw_transparent_panel(surface, x, y, w, h, border_color=(100, 100, 100), alpha=160, border_width=2, radius=12):
     temp_surf = pygame.Surface((w, h), pygame.SRCALPHA)
-    pygame.draw.rect(temp_surf, (25, 25, 30, alpha), (0, 0, w, h), border_radius=8)
+    pygame.draw.rect(temp_surf, (20, 20, 25, alpha), (0, 0, w, h), border_radius=radius)
     if border_width > 0:
-        pygame.draw.rect(temp_surf, border_color, (0, 0, w, h), border_width, border_radius=8)
+        pygame.draw.rect(temp_surf, border_color, (0, 0, w, h), border_width, border_radius=radius)
     surface.blit(temp_surf, (x, y))
 
 def draw_hp_bar(surface, x, y, w, h, current_hp, max_hp):
@@ -222,14 +222,24 @@ def get_valid_font(size, bold=False):
             
     return pygame.font.SysFont(None, size, bold=bold)
 
-def load_image(filename, size):
+def load_image(filename, size=None):
     if os.path.exists(filename):
         try:
             img = pygame.image.load(filename).convert_alpha()
-            return pygame.transform.scale(img, size)
+            if size:
+                return pygame.transform.scale(img, size)
+            return img
         except:
             pass
     return None
+
+def get_player_title(stage):
+    if stage == 1: return "[초보 탐험가]"
+    elif stage == 2: return "[슬라임 헌터]"
+    elif stage == 3: return "[고블린 추적자]"
+    elif stage == 4: return "[심연의 생존자]"
+    elif stage == 5: return "[흡혈귀 슬레이어]"
+    else: return "[지옥의 정복자]"
 
 def main():
     pygame.init()
@@ -243,8 +253,8 @@ def main():
     stage = load_game(player)
     
     font = get_valid_font(24)
-    small_font = get_valid_font(20)
-    title_font = get_valid_font(40, bold=True)
+    small_font = get_valid_font(18)
+    title_font = get_valid_font(48, bold=True)
     timer_font = get_valid_font(70, bold=True) 
     
     current_state = "MENU"
@@ -274,6 +284,7 @@ def main():
     player_img = load_image("player.png", (100, 100))
     bg_forest = load_image("bg_forest.png", (800, 600))
     bg_cave = load_image("bg_cave.png", (800, 600))
+    bg_menu = load_image("bg_menu.png", (800, 600)) 
     boss_img = None
 
     def change_state_with_fade(new_state):
@@ -308,7 +319,6 @@ def main():
                 continue
 
             if current_state == "MENU":
-                # 💡 [업데이트] 5번 키 입력 감지 추가
                 if event.type == pygame.KEYDOWN:
                     if event.key in [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5]:
                         sm.play("click") 
@@ -328,10 +338,9 @@ def main():
                     elif event.key == pygame.K_4:
                         change_state_with_fade("CONFIRM_RESET")
                     elif event.key == pygame.K_5:
-                        change_state_with_fade("STATISTICS") # 💡 통계 화면으로 이동
+                        change_state_with_fade("STATISTICS")
 
             elif current_state == "STATISTICS":
-                # 💡 [업데이트] 통계 화면에서 돌아가기 로직
                 if event.type == pygame.KEYDOWN:
                     if event.key in [pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE]:
                         sm.play("click")
@@ -548,42 +557,52 @@ def main():
 
         display_surf.fill((15, 15, 20)) 
         
-        if current_state == "TIMER":
-            if dungeon_type == 1 and bg_forest:
-                display_surf.blit(bg_forest, (0, 0))
-            elif dungeon_type == 2 and bg_cave:
-                display_surf.blit(bg_cave, (0, 0))
-                
         ore_str = f"철 {player.ores[0]} | 미스릴 {player.ores[1]} | 아다만 {player.ores[2]}"
         temp_ore_str = f"철 {player.temp_ores[0]} | 미스릴 {player.temp_ores[1]} | 아다만 {player.temp_ores[2]}"
 
+        # ==========================================
+        # 💡 메인 메뉴 (MENU) - 세로 간격 60px 일치화 완료
+        # ==========================================
         if current_state == "MENU":
-            game_title = title_font.render("던전모도로", True, (220, 220, 220)) 
-            sub_title = font.render(f"현재 위치: 스테이지 {stage}", True, (150, 150, 150))
-            display_surf.blit(game_title, (300, 50))
-            display_surf.blit(sub_title, (310, 110))
+            if bg_menu:
+                display_surf.blit(bg_menu, (0, 0))
             
-            # 💡 [업데이트] 메인 메뉴를 다시 화면 중앙으로 예쁘게 렌더링!
-            draw_panel(display_surf, 80, 160, 640, 390, border_color=(100, 150, 200))
+            title_text = title_font.render("던전모도로", True, (240, 240, 255))
+            title_rect = title_text.get_rect(center=(400, 70))
+            display_surf.blit(title_text, title_rect)
             
-            menu1 = font.render("[1] 던전 입장 (탐험 지역 선택)", True, (150, 255, 150))
-            menu2 = font.render("[2] 대장간 입장", True, (150, 200, 255))
-            inventory = small_font.render(f"보유 광물: [{ore_str}]", True, (255, 215, 0))
-            hp_info = small_font.render(f"현재 체력: {player.current_hp}/{player.max_hp} (휴식으로만 회복)", True, (255, 100, 100))
-            menu3 = font.render("[3] 보스전 도전", True, (255, 150, 150))
-            menu4 = font.render("[4] 데이터 초기화 (새로 시작)", True, (140, 140, 140))
-            # 💡 [신규 버튼] 5번 통계 보기 추가!
-            menu5 = font.render("[5] 나의 집중 통계 확인", True, (255, 200, 150))
+            sub_title = font.render(f"현재 위치: 스테이지 {stage}", True, (200, 200, 220))
+            sub_rect = sub_title.get_rect(center=(400, 120))
+            display_surf.blit(sub_title, sub_rect)
             
-            display_surf.blit(menu1, (120, 190))
-            display_surf.blit(menu2, (120, 240))
-            display_surf.blit(inventory, (160, 280)) 
-            display_surf.blit(hp_info, (160, 310))
-            display_surf.blit(menu3, (120, 360))
-            display_surf.blit(menu4, (120, 410))
-            display_surf.blit(menu5, (120, 460))
+            pygame.draw.polygon(display_surf, (150, 100, 255), [(400, 150), (395, 155), (400, 160), (405, 155)])
 
-        # 💡 [업데이트] 별도의 5번 탭 통계 화면 생성!
+            # 💡 [핵심] 여백이 완벽하게 밸런스 잡힌 패널 (너비 520, 높이 380)
+            panel_x, panel_y = 140, 180
+            panel_w, panel_h = 520, 380
+            draw_transparent_panel(display_surf, panel_x, panel_y, panel_w, panel_h, border_color=(100, 80, 150), alpha=210)
+            
+            menu1 = font.render("[1] 던전 입장 (탐험 지역 선택)", True, (150, 255, 150)) 
+            menu2 = font.render("[2] 대장간 입장", True, (150, 200, 255)) 
+            inventory = small_font.render(f"보유 광물: [{ore_str}]", True, (255, 215, 0)) 
+            hp_info = small_font.render(f"현재 체력: {player.current_hp}/{player.max_hp} (휴식으로만 회복)", True, (255, 100, 100)) 
+            menu3 = font.render("[3] 보스전 도전", True, (255, 150, 150)) 
+            menu4 = font.render("[4] 데이터 초기화 (새로 시작)", True, (140, 140, 140)) 
+            menu5 = font.render("[5] 나의 집중 통계 확인", True, (255, 200, 150)) 
+            
+            # 💡 [핵심] 메뉴 1~5번 사이의 세로 간격을 정확히 "60픽셀" 단위로 통일했습니다. (2번 항목의 서브 텍스트 공간은 +40 추가)
+            display_surf.blit(menu1, (panel_x + 60, panel_y + 40))
+            display_surf.blit(menu2, (panel_x + 60, panel_y + 100))
+            
+            # 2번 메뉴의 하위 정보들
+            display_surf.blit(inventory, (panel_x + 90, panel_y + 135)) 
+            display_surf.blit(hp_info, (panel_x + 90, panel_y + 160))   
+            
+            # 나머지 메뉴들도 모두 60픽셀 단위로 정확하게 증가
+            display_surf.blit(menu3, (panel_x + 60, panel_y + 200))
+            display_surf.blit(menu4, (panel_x + 60, panel_y + 260))
+            display_surf.blit(menu5, (panel_x + 60, panel_y + 320))
+
         elif current_state == "STATISTICS":
             stat_title = title_font.render("나의 집중 통계", True, (150, 255, 150))
             stat_subtitle = font.render("위대한 여정의 기록", True, (150, 150, 150))
@@ -649,6 +668,11 @@ def main():
 
         elif current_state == "TIMER":
             dungeon_name = "고요한 숲" if dungeon_type == 1 else "심연의 동굴"
+            if dungeon_type == 1 and bg_forest:
+                display_surf.blit(bg_forest, (0, 0))
+            elif dungeon_type == 2 and bg_cave:
+                display_surf.blit(bg_cave, (0, 0))
+                
             draw_transparent_panel(display_surf, 40, 40, 720, 520, border_color=(0,0,0), alpha=160, border_width=0)
             
             minutes = time_left // 60
