@@ -3,6 +3,7 @@ import sys
 import random
 import json
 import os
+import math
 
 class SoundManager:
     def __init__(self):
@@ -154,6 +155,14 @@ def draw_panel(surface, x, y, w, h, border_color=(100, 100, 100)):
     pygame.draw.rect(surface, (25, 25, 30), (x, y, w, h), border_radius=8)
     pygame.draw.rect(surface, border_color, (x, y, w, h), 3, border_radius=8)
 
+# 💡 [업데이트] 테두리 굵기(border_width)를 0으로 설정하면 테두리가 안 그려지도록 개선!
+def draw_transparent_panel(surface, x, y, w, h, border_color=(100, 100, 100), alpha=160, border_width=3):
+    temp_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+    pygame.draw.rect(temp_surf, (25, 25, 30, alpha), (0, 0, w, h), border_radius=8)
+    if border_width > 0:
+        pygame.draw.rect(temp_surf, border_color, (0, 0, w, h), border_width, border_radius=8)
+    surface.blit(temp_surf, (x, y))
+
 def draw_hp_bar(surface, x, y, w, h, current_hp, max_hp):
     ratio = max(current_hp / max_hp, 0)
     pygame.draw.rect(surface, (80, 20, 20), (x, y, w, h)) 
@@ -219,6 +228,8 @@ def main():
     font = get_valid_font(24)
     small_font = get_valid_font(20)
     title_font = get_valid_font(40, bold=True)
+    # 💡 [업데이트] 빈 중앙을 든든하게 채워줄 큼직한 전용 타이머 폰트 추가!
+    timer_font = get_valid_font(60, bold=True) 
     
     current_state = "MENU"
     time_left = 0 
@@ -244,6 +255,8 @@ def main():
     fade_surface.fill((0, 0, 0))
 
     player_img = load_image("player.png", (100, 100))
+    bg_forest = load_image("bg_forest.png", (800, 600))
+    bg_cave = load_image("bg_cave.png", (800, 600))
     boss_img = None
 
     def change_state_with_fade(new_state):
@@ -252,7 +265,7 @@ def main():
         fade_dir = 1 
 
     def roll_mineral():
-        if random.random() < 0.30:  # 30% 고정 확률
+        if random.random() < 0.30:  
             roll = random.randint(1, 100)
             if dungeon_type == 1:
                 if roll <= 60: player.temp_ores[0] += 1 
@@ -493,6 +506,13 @@ def main():
                         change_state_with_fade("MENU")
 
         display_surf.fill((15, 15, 20)) 
+        
+        if current_state == "TIMER":
+            if dungeon_type == 1 and bg_forest:
+                display_surf.blit(bg_forest, (0, 0))
+            elif dungeon_type == 2 and bg_cave:
+                display_surf.blit(bg_cave, (0, 0))
+                
         ore_str = f"철 {player.ores[0]} | 미스릴 {player.ores[1]} | 아다만 {player.ores[2]}"
         temp_ore_str = f"철 {player.temp_ores[0]} | 미스릴 {player.temp_ores[1]} | 아다만 {player.temp_ores[2]}"
 
@@ -536,11 +556,9 @@ def main():
             draw_panel(display_surf, 40, 180, 720, 350, border_color=(150, 255, 150))
             
             dun1_title = font.render("[1] 고요한 숲 (25분 집중)", True, (200, 255, 200))
-            # 💡 [업데이트] 던전 선택 화면에 확률 안내문 이사옴!
             dun1_prob = small_font.render("└ 10초당 30% 확률 획득 (철 60% | 미스릴 30% | 아다만 10%)", True, (150, 200, 150))
             
             dun2_title = font.render("[2] 심연의 동굴 (50분 딥워크)", True, (255, 150, 255))
-            # 💡 [업데이트] 던전 2 확률 정보 추가
             dun2_prob = small_font.render("└ 10초당 30% 확률 획득 (철 45% | 미스릴 35% | 아다만 20%)", True, (200, 150, 200))
             
             cancel_txt = small_font.render("[Enter] 마을로 돌아가기", True, (150, 150, 150))
@@ -554,7 +572,9 @@ def main():
         elif current_state == "TIMER":
             dungeon_name = "고요한 숲" if dungeon_type == 1 else "심연의 동굴"
             border_col = (100, 255, 100) if dungeon_type == 1 else (200, 100, 255)
-            draw_panel(display_surf, 40, 120, 720, 390, border_color=border_col)
+            
+            # 💡 [핵심 UX] border_width=0을 적용하여 테두리를 완전히 없앰!
+            draw_transparent_panel(display_surf, 40, 40, 720, 520, border_color=border_col, alpha=160, border_width=0)
             
             minutes = time_left // 60
             seconds = time_left % 60
@@ -562,26 +582,32 @@ def main():
             combo_txt = f"(연전 콤보 x{player.combo})" if player.combo > 0 else ""
             
             title_text = title_font.render(f"[{dungeon_name}] 탐험 중... {combo_txt}", True, (255, 255, 255))
-            timer_text = title_font.render(f"⏳ {time_str}", True, (100, 255, 100))
+            # 💡 타이머 글씨를 더 크고 또렷한 timer_font로 렌더링!
+            timer_text = timer_font.render(f"⏳ {time_str}", True, (100, 255, 100))
             
-            # 💡 [업데이트] 창고 지우고, 가방만 남겨서 시선 정리!
             temp_text = font.render(f"가방(임시): [{temp_ore_str}]", True, (255, 215, 0))
-            
-            # 💡 [업데이트] 3줄이던 경고 및 안내문을 짧고 간결하게 통폐합!
             warning_text = small_font.render("⚠️ 주의: 창을 벗어나면 캔 광물이 모두 증발합니다!", True, (255, 100, 100))
             
             vol_pct = int(sm.bgm_volume * 100)
-            bgm_status = small_font.render(f"🎵 BGM 단축키: [M] ON/OFF  |  🔊 볼륨 [↑/↓] ({vol_pct}%)", True, (150, 200, 255))
+            bg_status = small_font.render(f"🎵 BGM 단축키: [M] ON/OFF  |  🔊 볼륨 [↑/↓] ({vol_pct}%)", True, (150, 200, 255))
             
-            # 화면 중앙부터 여백을 넓혀서 쾌적하게 배치
-            display_surf.blit(title_text, (70, 150))
-            display_surf.blit(timer_text, (340, 220))
-            display_surf.blit(temp_text, (80, 300))
-            display_surf.blit(warning_text, (80, 380))
-            display_surf.blit(bgm_status, (80, 430))
+            # 💡 [핵심 UX] 괄호 내용을 삭제하여 깔끔해진 스킵 텍스트
+            skip_hint = font.render("[Space] 스킵", True, (180, 180, 180))
+
+            # --- 💡 레이아웃 재배치 (각 모서리로 밀어 넣기) ---
+            # 1. 왼쪽 위: 탐험 타이틀
+            display_surf.blit(title_text, (60, 60))
             
-            skip_hint = small_font.render("[Space] 스킵 (잔여 시간 보상 정산)", True, (100, 100, 100))
-            display_surf.blit(skip_hint, (510, 550))
+            # 2. 정중앙: 거대한 타이머 (용사가 빠진 공간을 든든하게 채움)
+            display_surf.blit(timer_text, (310, 250))
+            
+            # 3. 왼쪽 아래: 가방, 주의사항, BGM 정보
+            display_surf.blit(temp_text, (60, 430))
+            display_surf.blit(warning_text, (60, 470))
+            display_surf.blit(bg_status, (60, 510))
+            
+            # 4. 오른쪽 아래: 스킵 텍스트
+            display_surf.blit(skip_hint, (620, 510))
 
         elif current_state == "EXPLORATION_DONE":
             draw_panel(display_surf, 40, 140, 720, 350, border_color=(255, 215, 0))
