@@ -83,7 +83,7 @@ class Boss:
         self.current_hp = self.max_hp
         self.atk = 5 + (stage * 3)
         
-        boss_names = ["고블린 전사", "권투가 오크", "티모", "잔혹한 흡혈귀 뱀파이어", "잔혹한 흡혈귀 뱀파이어"]
+        boss_names = ["거대 맹독 슬라임", "단검 고블린 정찰병", "티모", "훈이", "지옥의 악마"]
         
         if stage <= len(boss_names):
             self.name = boss_names[stage - 1]
