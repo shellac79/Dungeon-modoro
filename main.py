@@ -540,9 +540,63 @@ def main():
             elif current_state == "BATTLE":
                 if event.type == BATTLE_EVENT and battle_status == "ONGOING":
                     if turn == "PLAYER":
-                        damage = player.atk
+
+                        critical = False
+
+                        if random.random() < 0.2:   # 20% 확률
+                            damage = player.atk * 2
+                            critical = True
+                        else:
+                            damage = player.atk
+
                         boss.current_hp -= damage
-                        battle_log.append(f"[공격] 플레이어의 공격! 보스에게 {damage} 피해.")
+
+                        if critical:
+                            battle_log.append(
+                                f"[크리티컬!] 플레이어의 공격! 보스에게 {damage} 피해!"
+                            )
+                            floating_texts.append(
+                                FloatingText(
+                                    "CRITICAL!",
+                                    430,
+                                    80,
+                                    (255,215,0),
+                                    title_font
+                                )
+                            )
+
+                            for _ in range(25):
+                                particles.append(
+                                    Particle(
+                                        480,
+                                        120,
+                                        random.choice([
+                                            (255,215,0),
+                                            (255,100,100),
+                                            (255,255,255)
+                                        ])
+                                    )
+                                )
+
+                        else:
+                            battle_log.append(
+                                f"[공격] 플레이어의 공격! 보스에게 {damage} 피해."
+                            )
+
+                        sm.play("hit")
+
+                        rx = random.randint(450, 530)
+                        ry = random.randint(30, 60)
+
+                        floating_texts.append(
+                            FloatingText(
+                                f"-{damage}",
+                                rx,
+                                ry,
+                                (255, 50, 50),
+                                title_font
+                            )
+                        )
                         sm.play("hit") 
                         rx = random.randint(450, 530)
                         ry = random.randint(30, 60)
