@@ -83,7 +83,7 @@ class Boss:
         self.current_hp = self.max_hp
         self.atk = 5 + (stage * 3)
         
-        boss_names = ["거대 맹독 슬라임", "단검 고블린 정찰병", "티모", "잔혹한 흡혈귀 뱀파이어", "지옥의 악마"]
+        boss_names = ["고블린 전사", "권투가 오크", "티모", "잔혹한 흡혈귀 뱀파이어", "잔혹한 흡혈귀 뱀파이어"]
         
         if stage <= len(boss_names):
             self.name = boss_names[stage - 1]
@@ -235,11 +235,11 @@ def load_image(filename, size=None):
 
 def get_player_title(stage):
     if stage == 1: return "[초보 탐험가]"
-    elif stage == 2: return "[슬라임 헌터]"
-    elif stage == 3: return "[고블린 추적자]"
-    elif stage == 4: return "[심연의 생존자]"
-    elif stage == 5: return "[흡혈귀 슬레이어]"
-    else: return "[지옥의 정복자]"
+    elif stage == 2: return "[고블린 헌터]"
+    elif stage == 3: return "[오크 학살자]"
+    elif stage == 4: return "[티모 킬러]"
+    elif stage == 5: return "[훈이 엄마]"
+    else: return "[벰파이어 슬레이어]"
 
 def main():
     pygame.init()
