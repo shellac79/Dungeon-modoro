@@ -240,6 +240,17 @@ def get_player_title(stage):
     elif stage == 4: return "[티모 킬러]"
     elif stage == 5: return "[훈이 엄마]"
     else: return "[벰파이어 슬레이어]"
+def get_focus_rank(total_seconds):
+    if total_seconds < 3600:
+        return "초보 수련생"
+    elif total_seconds < 10800:
+        return "집중 탐험가"
+    elif total_seconds < 21600:
+        return "집중 마스터"
+    elif total_seconds < 43200:
+        return "전설의 수행자"
+    else:
+        return "집중의 신"
 
 def main():
     pygame.init()
@@ -619,22 +630,27 @@ def main():
             draw_panel(display_surf, 80, 160, 640, 350, border_color=(150, 200, 150))
             
             study_mins = player.total_study_seconds // 60
+            focus_rank = get_focus_rank(player.total_study_seconds)
             stat_time = font.render(f"누적 집중 시간: {study_mins} 분", True, (200, 200, 200))
             stat_forest = font.render(f"고요한 숲 성공 횟수: {player.forest_successes} 회", True, (200, 200, 200))
             stat_cave = font.render(f"심연의 동굴 성공 횟수: {player.cave_successes} 회", True, (200, 200, 200))
             stat_lost = font.render(f"집중 이탈(딴짓) 횟수: {player.focus_lost_count} 회", True, (255, 150, 150))
+            stat_rank = font.render(f"현재 집중 랭크: {focus_rank}",True,(255, 215, 0))
             
             total_ores_sum = sum(player.total_ores_gained)
             stat_ores1 = font.render(f"누적 획득 보상: 총 {total_ores_sum} 개", True, (255, 215, 0))
             ores_detail = f"(철 {player.total_ores_gained[0]} | 미스릴 {player.total_ores_gained[1]} | 아다만 {player.total_ores_gained[2]})"
             stat_ores2 = small_font.render(ores_detail, True, (180, 180, 180))
             
-            display_surf.blit(stat_time, (120, 200))
-            display_surf.blit(stat_forest, (120, 250))
-            display_surf.blit(stat_cave, (120, 300))
-            display_surf.blit(stat_lost, (120, 350))
-            display_surf.blit(stat_ores1, (120, 410))
-            display_surf.blit(stat_ores2, (120, 440))
+            display_surf.blit(stat_time, (120, 190))
+            display_surf.blit(stat_rank, (120, 240))
+
+            display_surf.blit(stat_forest, (120, 290))
+            display_surf.blit(stat_cave, (120, 340))
+            display_surf.blit(stat_lost, (120, 390))
+
+            display_surf.blit(stat_ores1, (120, 450))
+            display_surf.blit(stat_ores2, (120, 480))
             
             guide_next = small_font.render("[Space] 또는 [Enter] 메뉴로 돌아가기", True, (100, 255, 100))
             display_surf.blit(guide_next, (250, 540))
