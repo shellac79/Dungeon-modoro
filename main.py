@@ -235,11 +235,11 @@ def load_image(filename, size=None):
 
 def get_player_title(stage):
     if stage == 1: return "[초보 탐험가]"
-    elif stage == 2: return "[슬라임 헌터]"
-    elif stage == 3: return "[고블린 추적자]"
-    elif stage == 4: return "[심연의 생존자]"
-    elif stage == 5: return "[흡혈귀 슬레이어]"
-    else: return "[지옥의 정복자]"
+    elif stage == 2: return "[고블린 헌터]"
+    elif stage == 3: return "[오크 학살자]"
+    elif stage == 4: return "[티모 킬러]"
+    elif stage == 5: return "[훈이 엄마]"
+    else: return "[벰파이어 슬레이어]"
 
 def main():
     pygame.init()
@@ -385,8 +385,16 @@ def main():
                 if event.type == pygame.WINDOWFOCUSLOST:
                     if sum(player.temp_ores) > 0:
                         sm.play("error") 
-                        shake_time = 12 
+                        # 💡 [팀원 A 구현] 딴짓 방지 페널티 강화 로직
+                        shake_time = 15 # 화면을 더 세게 흔들리게!
                         player.focus_lost_count += 1
+                        
+                        penalty_dmg = 10 + (player.combo * 5) # 콤보 비례 기습 데미지 산출
+                        player.current_hp = max(1, player.current_hp - penalty_dmg) # 체력 강제 감소
+                        player.combo = 0 # 공들인 콤보 초기화 페널티
+                        
+                        floating_texts.append(FloatingText(f"딴짓 발각! 기습 페널티 (-{penalty_dmg} HP)", 200, 250, (255, 50, 50), title_font))
+                        
                     player.temp_ores = [0, 0, 0] 
                 
                 if event.type == pygame.USEREVENT:
@@ -398,6 +406,10 @@ def main():
                     else:
                         if dungeon_type == 1: player.forest_successes += 1 
                         elif dungeon_type == 2: player.cave_successes += 1
+                        
+                        # 💡 [팀원 B 구현] 던전 탐험을 무사히 완료하면 데이터 손실 방지를 위한 자동 저장
+                        save_game(player, stage)
+                        
                         sm.stop_bgm() 
                         sm.play("upgrade") 
                         change_state_with_fade("EXPLORATION_DONE")
@@ -417,6 +429,10 @@ def main():
                         time_left = 0
                         if dungeon_type == 1: player.forest_successes += 1 
                         elif dungeon_type == 2: player.cave_successes += 1
+                        
+                        # 💡 [팀원 B 구현] 스킵으로 성공 처리되었을 때도 자동 저장 적용
+                        save_game(player, stage)
+                        
                         sm.stop_bgm()
                         sm.play("upgrade")
                         change_state_with_fade("EXPLORATION_DONE") 
@@ -560,9 +576,6 @@ def main():
         ore_str = f"철 {player.ores[0]} | 미스릴 {player.ores[1]} | 아다만 {player.ores[2]}"
         temp_ore_str = f"철 {player.temp_ores[0]} | 미스릴 {player.temp_ores[1]} | 아다만 {player.temp_ores[2]}"
 
-        # ==========================================
-        # 💡 메인 메뉴 (MENU) - 세로 간격 60px 일치화 완료
-        # ==========================================
         if current_state == "MENU":
             if bg_menu:
                 display_surf.blit(bg_menu, (0, 0))
@@ -577,7 +590,6 @@ def main():
             
             pygame.draw.polygon(display_surf, (150, 100, 255), [(400, 150), (395, 155), (400, 160), (405, 155)])
 
-            # 💡 [핵심] 여백이 완벽하게 밸런스 잡힌 패널 (너비 520, 높이 380)
             panel_x, panel_y = 140, 180
             panel_w, panel_h = 520, 380
             draw_transparent_panel(display_surf, panel_x, panel_y, panel_w, panel_h, border_color=(100, 80, 150), alpha=210)
@@ -590,15 +602,10 @@ def main():
             menu4 = font.render("[4] 데이터 초기화 (새로 시작)", True, (140, 140, 140)) 
             menu5 = font.render("[5] 나의 집중 통계 확인", True, (255, 200, 150)) 
             
-            # 💡 [핵심] 메뉴 1~5번 사이의 세로 간격을 정확히 "60픽셀" 단위로 통일했습니다. (2번 항목의 서브 텍스트 공간은 +40 추가)
             display_surf.blit(menu1, (panel_x + 60, panel_y + 40))
             display_surf.blit(menu2, (panel_x + 60, panel_y + 100))
-            
-            # 2번 메뉴의 하위 정보들
             display_surf.blit(inventory, (panel_x + 90, panel_y + 135)) 
             display_surf.blit(hp_info, (panel_x + 90, panel_y + 160))   
-            
-            # 나머지 메뉴들도 모두 60픽셀 단위로 정확하게 증가
             display_surf.blit(menu3, (panel_x + 60, panel_y + 200))
             display_surf.blit(menu4, (panel_x + 60, panel_y + 260))
             display_surf.blit(menu5, (panel_x + 60, panel_y + 320))
@@ -784,10 +791,11 @@ def main():
                 if p.life <= 0: particles.remove(p)
 
         elif current_state == "BATTLE":
-            draw_panel(display_surf, 40, 40, 350, 200, border_color=(100, 200, 255))
+            # 💡 [팀원 C 구현] 보스전 패널 UI 반투명 스타일(알파 180) 일괄 적용
+            draw_transparent_panel(display_surf, 40, 40, 350, 200, border_color=(100, 200, 255), alpha=180)
             if player_img: display_surf.blit(player_img, (60, 60))
             else: pygame.draw.rect(display_surf, (100, 200, 255), (60, 60, 100, 100), 2) 
-            p_title = font.render("플레이어", True, (100, 200, 255))
+            p_title = font.render(f"플레이어 {get_player_title(stage)}", True, (100, 200, 255))
             p_stat = small_font.render(f"공격력: {player.atk}", True, (200, 200, 200))
             p_hp_text = small_font.render(f"HP {player.current_hp}/{player.max_hp}", True, (255, 255, 255))
             display_surf.blit(p_title, (180, 60))
@@ -795,7 +803,7 @@ def main():
             display_surf.blit(p_hp_text, (180, 135))
             draw_hp_bar(display_surf, 60, 180, 310, 20, player.current_hp, player.max_hp)
             
-            draw_panel(display_surf, 410, 40, 350, 200, border_color=(255, 100, 100))
+            draw_transparent_panel(display_surf, 410, 40, 350, 200, border_color=(255, 100, 100), alpha=180)
             if boss_img: display_surf.blit(boss_img, (430, 60))
             else: pygame.draw.rect(display_surf, (255, 100, 100), (430, 60, 100, 100), 2)
             b_title = font.render(f"{boss.name}", True, (255, 100, 100))
@@ -806,7 +814,7 @@ def main():
             display_surf.blit(b_hp_text, (550, 135))
             draw_hp_bar(display_surf, 430, 180, 310, 20, boss.current_hp, boss.max_hp)
             
-            draw_panel(display_surf, 40, 260, 720, 290, border_color=(150, 150, 150))
+            draw_transparent_panel(display_surf, 40, 260, 720, 290, border_color=(150, 150, 150), alpha=180)
             log_start_y = 280
             for i, log in enumerate(battle_log):
                 color = (255, 215, 0) if i == len(battle_log) - 1 else (180, 180, 180)
