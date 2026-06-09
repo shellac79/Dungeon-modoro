@@ -79,9 +79,26 @@ class Player:
 class Boss:
     def __init__(self, stage):
         self.stage = stage
-        self.max_hp = 50 + (stage * 50) 
+        
+        # 난이도 대폭 상승을 위한 기하급수적 스탯 증가
+        if stage == 1:
+            self.max_hp = 150
+            self.atk = 10
+        elif stage == 2:
+            self.max_hp = 350
+            self.atk = 20
+        elif stage == 3:
+            self.max_hp = 700
+            self.atk = 32
+        elif stage == 4:
+            self.max_hp = 1300
+            self.atk = 45
+        else:
+            # 5단계 이상부터는 스테이지에 비례하여 계속 강해짐
+            self.max_hp = 2000 + ((stage - 5) * 800)
+            self.atk = 60 + ((stage - 5) * 15)
+            
         self.current_hp = self.max_hp
-        self.atk = 5 + (stage * 3)
         
         boss_names = ["거대 맹독 슬라임", "단검 고블린 정찰병", "티모", "훈이", "지옥의 악마"]
         
@@ -188,15 +205,17 @@ def draw_hp_bar(surface, x, y, w, h, current_hp, max_hp):
 
 def get_upgrade_req(level):
     req = [0, 0, 0] 
+    multiplier = 3.33 
+    
     if level < 10:
-        req[0] = (level % 10) + 1 
+        req[0] = int(((level % 10) + 1) * multiplier)
     elif level < 20:
-        req[0] = 5                
-        req[1] = (level % 10) + 1 
+        req[0] = int(5 * multiplier)                
+        req[1] = int(((level % 10) + 1) * multiplier) 
     else:
-        req[0] = 10               
-        req[1] = 5                
-        req[2] = (level % 10) + 1 
+        req[0] = int(10 * multiplier)              
+        req[1] = int(5 * multiplier)                
+        req[2] = int(((level % 10) + 1) * multiplier) 
     return req
 
 def req_to_string(req_list):
@@ -240,6 +259,7 @@ def get_player_title(stage):
     elif stage == 4: return "[티모 킬러]"
     elif stage == 5: return "[훈이 엄마]"
     else: return "[벰파이어 슬레이어]"
+
 def get_focus_rank(total_seconds):
     if total_seconds < 3600:
         return "초보 수련생"
@@ -304,7 +324,7 @@ def main():
         fade_dir = 1 
 
     def roll_mineral():
-        if random.random() < 0.30:  
+        if random.random() < 0.50:  
             roll = random.randint(1, 100)
             if dungeon_type == 1:
                 if roll <= 60: player.temp_ores[0] += 1 
@@ -396,13 +416,12 @@ def main():
                 if event.type == pygame.WINDOWFOCUSLOST:
                     if sum(player.temp_ores) > 0:
                         sm.play("error") 
-                        # 💡 [팀원 A 구현] 딴짓 방지 페널티 강화 로직
-                        shake_time = 15 # 화면을 더 세게 흔들리게!
+                        shake_time = 15 
                         player.focus_lost_count += 1
                         
-                        penalty_dmg = 10 + (player.combo * 5) # 콤보 비례 기습 데미지 산출
-                        player.current_hp = max(1, player.current_hp - penalty_dmg) # 체력 강제 감소
-                        player.combo = 0 # 공들인 콤보 초기화 페널티
+                        penalty_dmg = 10 + (player.combo * 5)
+                        player.current_hp = max(1, player.current_hp - penalty_dmg) 
+                        player.combo = 0 
                         
                         floating_texts.append(FloatingText(f"딴짓 발각! 기습 페널티 (-{penalty_dmg} HP)", 200, 250, (255, 50, 50), title_font))
                         
@@ -412,15 +431,13 @@ def main():
                     if time_left > 0:
                         time_left -= 1
                         player.total_study_seconds += 1
-                        if time_left > 0 and time_left % 10 == 0:
+                        if time_left > 0 and time_left % 5 == 0:
                             roll_mineral()
                     else:
                         if dungeon_type == 1: player.forest_successes += 1 
                         elif dungeon_type == 2: player.cave_successes += 1
                         
-                        # 💡 [팀원 B 구현] 던전 탐험을 무사히 완료하면 데이터 손실 방지를 위한 자동 저장
                         save_game(player, stage)
-                        
                         sm.stop_bgm() 
                         sm.play("upgrade") 
                         change_state_with_fade("EXPLORATION_DONE")
@@ -433,7 +450,7 @@ def main():
                     elif event.key == pygame.K_DOWN:
                         sm.change_volume(-0.1) 
                     elif event.key == pygame.K_SPACE:
-                        remaining_intervals = time_left // 10
+                        remaining_intervals = time_left // 5
                         for _ in range(remaining_intervals):
                             roll_mineral()
                         player.total_study_seconds += time_left 
@@ -441,9 +458,7 @@ def main():
                         if dungeon_type == 1: player.forest_successes += 1 
                         elif dungeon_type == 2: player.cave_successes += 1
                         
-                        # 💡 [팀원 B 구현] 스킵으로 성공 처리되었을 때도 자동 저장 적용
                         save_game(player, stage)
-                        
                         sm.stop_bgm()
                         sm.play("upgrade")
                         change_state_with_fade("EXPLORATION_DONE") 
@@ -543,7 +558,7 @@ def main():
 
                         critical = False
 
-                        if random.random() < 0.2:   # 20% 확률
+                        if random.random() < 0.2:  
                             damage = player.atk * 2
                             critical = True
                         else:
@@ -730,10 +745,10 @@ def main():
             draw_panel(display_surf, 40, 180, 720, 350, border_color=(150, 255, 150))
             
             dun1_title = font.render("[1] 고요한 숲 (25분 집중)", True, (200, 255, 200))
-            dun1_prob = small_font.render("- 10초당 30% 확률 획득 (철 60% | 미스릴 30% | 아다만 10%)", True, (150, 200, 150))
+            dun1_prob = small_font.render("- 5초당 50% 확률 획득 (철 60% | 미스릴 30% | 아다만 10%)", True, (150, 200, 150))
             
             dun2_title = font.render("[2] 심연의 동굴 (50분 딥워크)", True, (255, 150, 255))
-            dun2_prob = small_font.render("- 10초당 30% 확률 획득 (철 45% | 미스릴 35% | 아다만 20%)", True, (200, 150, 200))
+            dun2_prob = small_font.render("- 5초당 50% 확률 획득 (철 45% | 미스릴 35% | 아다만 20%)", True, (200, 150, 200))
             
             cancel_txt = small_font.render("[Enter] 마을로 돌아가기", True, (150, 150, 150))
             
@@ -861,7 +876,6 @@ def main():
                 if p.life <= 0: particles.remove(p)
 
         elif current_state == "BATTLE":
-            # 💡 [팀원 C 구현] 보스전 패널 UI 반투명 스타일(알파 180) 일괄 적용
             draw_transparent_panel(display_surf, 40, 40, 350, 200, border_color=(100, 200, 255), alpha=180)
             if player_img: display_surf.blit(player_img, (60, 60))
             else: pygame.draw.rect(display_surf, (100, 200, 255), (60, 60, 100, 100), 2) 
